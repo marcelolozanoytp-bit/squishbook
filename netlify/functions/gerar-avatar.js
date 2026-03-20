@@ -1,3 +1,4 @@
+const https = require('https');
 exports.handler = async function(event) {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' }, body: '' };
   if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
@@ -7,10 +8,19 @@ exports.handler = async function(event) {
   try { parsed = JSON.parse(event.body || '{}'); } catch(e) { return { statusCode: 400, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ erro: 'JSON invalido' }) }; }
   const model = parsed.model || 'fal-ai/flux/schnell';
   const payload = parsed.payload || {};
-  try {
-    const res = await fetch('https://fal.run/' + model, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Key ' + FAL_KEY }, body: JSON.stringify(payload) });
-    const text = await res.text();
-    let data; try { data = JSON.parse(text); } catch(e) { data = { raw: text }; }
-    return { statusCode: res.status, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(data) };
-  } catch(e) { return { statusCode: 500, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ erro: e.message }) }; }
+  return new Promise((resolve) => {
+    const bodyStr = JSON.stringify(payload);
+    const options = { hostname: 'fal.run', path: '/' + model, method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Key ' + FAL_KEY, 'Content-Length': Buffer.byteLength(bodyStr) } };
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        let p; try { p = JSON.parse(data); } catch(e) { p = { raw: data }; }
+        resolve({ statusCode: res.statusCode, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(p) });
+      });
+    });
+    req.on('error', (e) => { resolve({ statusCode: 500, headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ erro: e.message }) }); });
+    req.write(bodyStr);
+    req.end();
+  });
 };
