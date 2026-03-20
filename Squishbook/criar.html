@@ -744,10 +744,9 @@ async function gerarHistoria(){
   var prompt = buildPrompt(est, proto, '', tema, listaP, instrP);
 
   try{
-    var ANTHROPIC_KEY='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';
-    var res=await fetch('https://api.anthropic.com/v1/messages',{
+    var res=await fetch('/.netlify/functions/gerar-historia',{
       method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':ANTHROPIC_KEY,'anthropic-version':'2023-06-01'},
+      headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:4000,messages:[{role:'user',content:prompt}]})
     });
     var data=await res.json();
@@ -979,10 +978,10 @@ async function gerarAvatarDalle(p){
     var body = (!ehPet && imageUrl)
       ? {prompt:prompt, reference_images:[{image_url:imageUrl}], num_images:1, image_size:'square_hd', guidance_scale:8}
       : {prompt:prompt, num_images:1, image_size:'square_hd'};
-    var res = await fetch('https://fal.run/'+model, {
+    var res = await fetch('/.netlify/functions/gerar-avatar', {
       method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Key '+FAL_KEY},
-      body:JSON.stringify(body)
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:model,payload:body})
     });
     var data = await res.json();
     var url = data.images && data.images[0] && data.images[0].url;
@@ -1334,10 +1333,10 @@ async function gerarCenaPagina(pg,idx,FAL_KEY){
     var body=refs.length>0
       ?{prompt:prompt,reference_images:refs,num_images:1,image_size:'square_hd',guidance_scale:6}
       :{prompt:prompt,num_images:1,image_size:'square_hd'};
-    var res=await fetch('https://fal.run/'+model,{
+    var res=await fetch('/.netlify/functions/gerar-avatar',{
       method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Key '+FAL_KEY},
-      body:JSON.stringify(body)
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:model,payload:body})
     });
     var data=await res.json();
     var url=data.images&&data.images[0]&&data.images[0].url;
@@ -1513,9 +1512,9 @@ async function aplicarAjuste(){
     +'\n\nResponda APENAS com o JSON no mesmo formato da historia atual (sem markdown).';
 
   try{
-    var res=await fetch('https://api.anthropic.com/v1/messages',{
+    var res=await fetch('/.netlify/functions/gerar-historia',{
       method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':ANTHROPIC_KEY,'anthropic-version':'2023-06-01'},
+      headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         model:'claude-sonnet-4-20250514',max_tokens:4000,
         messages:[{role:'user',content:promptAjuste}]
