@@ -1,5 +1,7 @@
 [build]
-  functions = "netlify/functions"
+  base = "Squishbook"
+  publish = "Squishbook"
+  functions = "Squishbook/netlify/functions"
 
 [[headers]]
   for = "/*"
