@@ -619,7 +619,6 @@ function av3(){
 
 // S4: GERACAO
 function s4(c){
-  var ANTHROPIC_KEY = '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';
   var proto=ST.personagens[0];
   var est=ST.estiloFinal||'narrativo';
   var estLabel=est==='visual'?'\u{1F3A8} Visual':'\ u{1F4DA} Narrativo';
@@ -725,7 +724,6 @@ async function gerarHistoria(){
   var idx=0;
   var iv=setInterval(function(){var el=document.getElementById('loadTxt');if(el)el.textContent=msgs[++idx%msgs.length];},1800);
 
-  var ANTHROPIC_KEY = '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';
   var proto=ST.personagens[0];
   var est=ST.estiloFinal||'narrativo';
   var rot=ROTEIROS.filter(function(r){return r.id===ST.roteiro;})[0];
@@ -888,18 +886,27 @@ function renderAvatarGrid(){
 }
 
 async function gerarAvatarDalle(p){
-  var FAL_KEY = '4f18a392-57b2-415a-925e-40bc7727c91c:2411ce44dc2051d06ec610a903deeb3f';
-  var ANTHROPIC_KEY = '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';
-
-  // Converte foto para base64
+  // Converte e REDIMENSIONA foto para base64 (max 512px para nao estourar o limite da function)
   var imageUrl = null;
   if(p.fotoUrl && p.fotoUrl.startsWith('blob:')){
     try{
       var blob = await fetch(p.fotoUrl).then(function(r){return r.blob();});
       imageUrl = await new Promise(function(res){
-        var reader = new FileReader();
-        reader.onloadend = function(){ res(reader.result); };
-        reader.readAsDataURL(blob);
+        var img = new Image();
+        img.onload = function(){
+          var MAX = 512;
+          var w = img.width, h = img.height;
+          if(w > MAX || h > MAX){
+            if(w > h){ h = Math.round(h * MAX / w); w = MAX; }
+            else { w = Math.round(w * MAX / h); h = MAX; }
+          }
+          var canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          res(canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.onerror = function(){ res(null); };
+        img.src = URL.createObjectURL(blob);
       });
     }catch(e){ imageUrl = null; }
   }
@@ -978,11 +985,15 @@ async function gerarAvatarDalle(p){
     var body = (!ehPet && imageUrl)
       ? {prompt:prompt, reference_images:[{image_url:imageUrl}], num_images:1, image_size:'square_hd', guidance_scale:8}
       : {prompt:prompt, num_images:1, image_size:'square_hd'};
+    var ctrl=new AbortController();
+    var tmout=setTimeout(function(){ctrl.abort();},45000);
     var res = await fetch('/.netlify/functions/gerar-avatar', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:model,payload:body})
+      body:JSON.stringify({model:model,payload:body}),
+      signal:ctrl.signal
     });
+    clearTimeout(tmout);
     var data = await res.json();
     var url = data.images && data.images[0] && data.images[0].url;
     if(url){ p.avatarUrl=url; } else { p.avatarErro=true; }
@@ -1225,7 +1236,7 @@ async function gerarCenas(){
   var BATCH=3;
   for(var b=0;b<paginas.length;b+=BATCH){
     var lote=paginas.slice(b,b+BATCH);
-    var promises=lote.map(function(pg,li){return gerarCenaPagina(pg,b+li,FAL_KEY);});
+    var promises=lote.map(function(pg,li){return gerarCenaPagina(pg,b+li);});
     var resultados=await Promise.all(promises);
     for(var r=0;r<resultados.length;r++){
       POS.cenasGeradas.push(resultados[r]);
@@ -1244,7 +1255,7 @@ async function gerarCenas(){
   await new Promise(function(r){setTimeout(r,400);});
 }
 
-async function gerarCenaPagina(pg,idx,FAL_KEY){
+async function gerarCenaPagina(pg,idx){
   // Detecta personagens que aparecem no texto desta pagina
   var parsNaPg=[];
   for(var i=0;i<ST.personagens.length;i++){
@@ -1333,11 +1344,16 @@ async function gerarCenaPagina(pg,idx,FAL_KEY){
     var body=refs.length>0
       ?{prompt:prompt,reference_images:refs,num_images:1,image_size:'square_hd',guidance_scale:6}
       :{prompt:prompt,num_images:1,image_size:'square_hd'};
+    // Timeout de 45 segundos para nao travar infinitamente
+    var controller=new AbortController();
+    var timeout=setTimeout(function(){controller.abort();},45000);
     var res=await fetch('/.netlify/functions/gerar-avatar',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:model,payload:body})
+      body:JSON.stringify({model:model,payload:body}),
+      signal:controller.signal
     });
+    clearTimeout(timeout);
     var data=await res.json();
     var url=data.images&&data.images[0]&&data.images[0].url;
     return {pg:pg,idx:idx,url:url||null,erro:!url};
@@ -1491,7 +1507,6 @@ async function aplicarAjuste(){
   if(!txt||!txt.value.trim()) return;
   if(POS.rodadasAjuste>=POS.maxRodadas) return;
 
-  var ANTHROPIC_KEY = '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';
   var feedback=txt.value.trim();
   POS.rodadasAjuste++;
 
