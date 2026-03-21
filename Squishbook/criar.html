@@ -742,7 +742,7 @@ async function gerarHistoria(){
   var prompt = buildPrompt(est, proto, '', tema, listaP, instrP);
 
   try{
-    var res=await fetch('/.netlify/functions/gerar-historia',{
+    var res=await fetch('https://squishbook-backend.onrender.com/api/historia',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:4000,messages:[{role:'user',content:prompt}]})
@@ -987,7 +987,7 @@ async function gerarAvatarDalle(p){
       : {prompt:prompt, num_images:1, image_size:'square_hd'};
     var ctrl=new AbortController();
     var tmout=setTimeout(function(){ctrl.abort();},45000);
-    var res = await fetch('/.netlify/functions/gerar-avatar', {
+    var res = await fetch('https://squishbook-backend.onrender.com/api/avatar', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:model,payload:body}),
@@ -1126,10 +1126,9 @@ async function finalizar(){
     +'<div class="loading-txt">Preparando pagamento...</div>'
     +'<div class="loading-sub">Aguarde um instante</div></div>';
   try{
-    var MP_TOKEN='APP_USR-6823491586758464-031922-4db2c95ddd67b27422b408b617873ee0-349627271';
-    var res=await fetch('https://api.mercadopago.com/checkout/preferences',{
+    var res=await fetch('https://squishbook-backend.onrender.com/api/pagamento',{
       method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+MP_TOKEN},
+      headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         items:[{title:'Squishbook - '+ST.historia.titulo,
           description:'Livro personalizado para '+ST.personagens[0].nome+' ('+(fmtObj?fmtObj.t:'Digital')+')',
@@ -1347,7 +1346,7 @@ async function gerarCenaPagina(pg,idx){
     // Timeout de 45 segundos para nao travar infinitamente
     var controller=new AbortController();
     var timeout=setTimeout(function(){controller.abort();},45000);
-    var res=await fetch('/.netlify/functions/gerar-avatar',{
+    var res=await fetch('https://squishbook-backend.onrender.com/api/avatar',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:model,payload:body}),
@@ -1527,7 +1526,7 @@ async function aplicarAjuste(){
     +'\n\nResponda APENAS com o JSON no mesmo formato da historia atual (sem markdown).';
 
   try{
-    var res=await fetch('/.netlify/functions/gerar-historia',{
+    var res=await fetch('https://squishbook-backend.onrender.com/api/historia',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
