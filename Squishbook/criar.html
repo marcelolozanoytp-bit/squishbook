@@ -983,7 +983,7 @@ async function gerarAvatarDalle(p){
   try{
     var model = (!ehPet && imageUrl) ? 'fal-ai/flux-pulid' : 'fal-ai/flux/schnell';
     var body = (!ehPet && imageUrl)
-      ? {prompt:prompt, reference_images:[{image_url:imageUrl}], num_images:1, image_size:'square_hd', guidance_scale:8}
+      ? {prompt:prompt, reference_image_url:imageUrl, num_images:1, image_size:'square_hd', guidance_scale:8}
       : {prompt:prompt, num_images:1, image_size:'square_hd'};
     var ctrl=new AbortController();
     var tmout=setTimeout(function(){ctrl.abort();},45000);
@@ -1341,7 +1341,7 @@ async function gerarCenaPagina(pg,idx){
   try{
     var model=refs.length>0?'fal-ai/flux-pulid':'fal-ai/flux/schnell';
     var body=refs.length>0
-      ?{prompt:prompt,reference_images:refs,num_images:1,image_size:'square_hd',guidance_scale:6}
+      ?{prompt:prompt,reference_image_url:refs[0].image_url,num_images:1,image_size:'square_hd',guidance_scale:6}
       :{prompt:prompt,num_images:1,image_size:'square_hd'};
     // Timeout de 45 segundos para nao travar infinitamente
     var controller=new AbortController();
@@ -1515,6 +1515,9 @@ async function aplicarAjuste(){
     +'<div class="loading-sub">A IA esta interpretando sua solicitacao</div></div>';
 
   // Prompt de ajuste para a historia
+  // Garante que a historia existe antes de ajustar
+  if(!ST.historia||!ST.historia.titulo){mostrarPosPagamento(document.getElementById('cardContent'));return;}
+
   var promptAjuste='Voce escreveu uma historia infantil e o cliente pediu um ajuste. '
     +'Historia atual:\n\nTitulo: '+ST.historia.titulo
     +'\n\nInicio:\n'+(ST.historia.inicio||ST.historia.paginas?JSON.stringify(ST.historia.paginas):'')
