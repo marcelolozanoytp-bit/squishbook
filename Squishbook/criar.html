@@ -996,7 +996,19 @@ async function gerarAvatarDalle(p){
     clearTimeout(tmout);
     var data = await res.json();
     var url = data.images && data.images[0] && data.images[0].url;
-    if(url){ p.avatarUrl=url; } else { p.avatarErro=true; }
+    if(url){ 
+      p.avatarUrl=url;
+      // Salva prompt base e caracteristicas para reusar nas cenas
+      // As cenas vao usar esse mesmo prompt + avatarUrl como referencia de estilo
+      p.promptBase = ehPet
+        ? ('Squishbook style kawaii chibi animal character, '+descFisica+cor+' color palette. ')
+        : ('Squishbook style chibi character. '+descFisica
+          +'Squishbook art style: ultra soft squishy human plush doll character, '
+          +'oversized glossy eyes with sparkle highlights, chubby round human face, rosy cheeks, '
+          +'big head small body chibi proportions, '+cor+' clothing and accent colors. ');
+      p.ehPet=ehPet;
+      p.cor=cor;
+    } else { p.avatarErro=true; }
   }catch(e){
     p.avatarErro=true;
   }
@@ -1309,7 +1321,8 @@ async function gerarCenaPagina(pg,idx){
   }
 
   var prompt='Squishbook children book illustration. '
-    +'Main characters: '+nomesNaPg+' as adorable kawaii chibi squish plush doll characters. '
+    +'CHARACTERS IN THIS SCENE (draw them EXACTLY as described, same style as their approved avatar): '
+    +descPersonagens
     +acaoInteracao
     +'Characters expression and mood: '+expressao+'. '
     +'BACKGROUND SCENE (very important): '+cenario+'. '
@@ -1321,28 +1334,29 @@ async function gerarCenaPagina(pg,idx){
     +'painterly background with depth and detail, characters in foreground. '
     +'NO text, NO watermark, NO speech bubbles.';
 
-  // Imagens de referencia: avatares dos personagens na cena
-  var refs=[];
+  // Monta prompt descrevendo cada personagem usando o promptBase salvo no avatar aprovado
+  // Isso garante que as cenas usem EXATAMENTE o mesmo personagem do passo 5
+  var descPersonagens='';
+  var primeiroAvatarUrl=null;
   for(var i=0;i<parsNaPg.length;i++){
-    if(parsNaPg[i].avatarUrl) refs.push({image_url:parsNaPg[i].avatarUrl});
-    else if(parsNaPg[i].fotoUrl&&parsNaPg[i].fotoUrl.startsWith('blob:')){
-      try{
-        var blob=await fetch(parsNaPg[i].fotoUrl).then(function(r){return r.blob();});
-        var b64=await new Promise(function(res){
-          var rd=new FileReader();
-          rd.onloadend=function(){res(rd.result);};
-          rd.readAsDataURL(blob);
-        });
-        refs.push({image_url:b64});
-      }catch(e){}
+    var par=parsNaPg[i];
+    if(par.promptBase){
+      descPersonagens+=par.nome+' ('+par.nome+'): '+par.promptBase;
+    } else {
+      descPersonagens+=par.nome+': adorable kawaii chibi character, ';
     }
+    if(!primeiroAvatarUrl&&par.avatarUrl) primeiroAvatarUrl=par.avatarUrl;
   }
+  var refs=[];
+  if(primeiroAvatarUrl) refs.push({image_url:primeiroAvatarUrl});
 
   try{
-    var model=refs.length>0?'fal-ai/flux-pulid':'fal-ai/flux/schnell';
-    var body=refs.length>0
-      ?{prompt:prompt,reference_image_url:refs[0].image_url,num_images:1,image_size:'square_hd',guidance_scale:6}
-      :{prompt:prompt,num_images:1,image_size:'square_hd'};
+    // Usa flux/schnell com avatarUrl como referencia de imagem (image_url)
+    // O modelo mantem consistencia de estilo visual com o avatar aprovado
+    var model='fal-ai/flux/schnell';
+    var body=primeiroAvatarUrl
+      ?{prompt:prompt,image_url:primeiroAvatarUrl,num_images:1,image_size:'landscape_4_3',strength:0.85}
+      :{prompt:prompt,num_images:1,image_size:'landscape_4_3'};
     // Timeout de 45 segundos para nao travar infinitamente
     var controller=new AbortController();
     var timeout=setTimeout(function(){controller.abort();},45000);
