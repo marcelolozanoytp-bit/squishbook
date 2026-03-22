@@ -1285,88 +1285,76 @@ async function gerarCenaPagina(pg,idx){
   var expressao='joyful and curious';
   if(combinado.indexOf('assust')>-1||combinado.indexOf('medo')>-1||combinado.indexOf('terror')>-1) expressao='scared but brave, wide eyes';
   else if(combinado.indexOf('triste')>-1||combinado.indexOf('chor')>-1||combinado.indexOf('lagrima')>-1) expressao='sad and emotional, teary eyes';
-  else if(combinado.indexOf('alegr')>-1||combinado.indexOf('feliz')>-1||combinado.indexOf('sorri')>-1||combinado.indexOf('rio')>-1) expressao='very happy, big smile, laughing';
-  else if(combinado.indexOf('corag')>-1||combinado.indexOf('brav')>-1||combinado.indexOf('heroi')>-1||combinado.indexOf('luta')>-1) expressao='brave and determined, heroic pose';
-  else if(combinado.indexOf('abraco')>-1||combinado.indexOf('carinho')>-1||combinado.indexOf('amor')>-1||combinado.indexOf('juntos')>-1) expressao='warm and loving, hugging or holding hands';
-  else if(combinado.indexOf('surpres')>-1||combinado.indexOf('espant')>-1||combinado.indexOf('incr')>-1) expressao='amazed and surprised, mouth open wide';
-  else if(combinado.indexOf('dormi')>-1||combinado.indexOf('sonho')>-1||combinado.indexOf('noite')>-1) expressao='sleepy and dreamy, soft closed eyes';
-  else if(combinado.indexOf('raiva')>-1||combinado.indexOf('bravo')>-1||combinado.indexOf('zangad')>-1) expressao='determined and upset, furrowed brow';
+  else if(combinado.indexOf('alegr')>-1||combinado.indexOf('feliz')>-1||combinado.indexOf('sorri')>-1) expressao='very happy, big smile, laughing';
+  else if(combinado.indexOf('corag')>-1||combinado.indexOf('heroi')>-1||combinado.indexOf('brav')>-1) expressao='brave and determined, heroic pose';
+  else if(combinado.indexOf('abraco')>-1||combinado.indexOf('amor')>-1||combinado.indexOf('juntos')>-1) expressao='warm and loving';
+  else if(combinado.indexOf('surpres')>-1||combinado.indexOf('espant')>-1) expressao='amazed and surprised, mouth open wide';
+  else if(combinado.indexOf('dormi')>-1||combinado.indexOf('sonho')>-1||combinado.indexOf('noite')>-1) expressao='sleepy and dreamy';
+  else if(combinado.indexOf('raiva')>-1||combinado.indexOf('zangad')>-1) expressao='upset and determined';
 
-  // CENARIO: detecta o ambiente no texto da cena
-  var cenario='cozy warm indoors';
-  if(combinado.indexOf('quarto')>-1||combinado.indexOf('cama')>-1||combinado.indexOf('dormit')>-1) cenario='cozy bedroom with soft bed and fairy lights, warm pastel walls';
-  else if(combinado.indexOf('floresta')>-1||combinado.indexOf('mata')>-1||combinado.indexOf('arvore')>-1||combinado.indexOf('bosque')>-1) cenario='magical enchanted forest with giant glowing trees, fireflies, soft green light';
-  else if(combinado.indexOf('castelo')>-1||combinado.indexOf('palacio')>-1||combinado.indexOf('torre')>-1) cenario='fairy tale castle interior with stone walls, colorful banners and magic windows';
-  else if(combinado.indexOf('praia')>-1||combinado.indexOf('mar')>-1||combinado.indexOf('ocean')>-1||combinado.indexOf('onda')>-1) cenario='sunny beach with crystal blue sea, colorful umbrellas and golden sand';
-  else if(combinado.indexOf('escola')>-1||combinado.indexOf('sala de aula')>-1||combinado.indexOf('aula')>-1) cenario='cheerful classroom with colorful desks, drawings on chalkboard and bright windows';
-  else if(combinado.indexOf('parque')>-1||combinado.indexOf('jardim')>-1||combinado.indexOf('playground')>-1) cenario='colorful park playground with swings, slide and blooming flowers';
-  else if(combinado.indexOf('cozinha')>-1||combinado.indexOf('comi')>-1||combinado.indexOf('comida')>-1||combinado.indexOf('bolo')>-1) cenario='warm cozy kitchen with cakes and cookies on table, warm oven glow';
-  else if(combinado.indexOf('ceu')>-1||combinado.indexOf('nuvem')>-1||combinado.indexOf('voar')>-1||combinado.indexOf('voo')>-1) cenario='magical sky with fluffy white clouds, rainbow and golden sunlight';
-  else if(combinado.indexOf('caverna')>-1||combinado.indexOf('gruta')>-1||combinado.indexOf('escuro')>-1) cenario='mysterious cave with glowing crystals, dramatic shadows and hidden light';
-  else if(combinado.indexOf('casa')>-1||combinado.indexOf('sala')>-1||combinado.indexOf('lar')>-1) cenario='warm and cozy living room with sofa, family photos on wall and soft lighting';
-  else if(combinado.indexOf('cidade')>-1||combinado.indexOf('rua')>-1||combinado.indexOf('bairro')>-1) cenario='charming colorful street with small shops, cobblestones and flower pots';
-  else if(combinado.indexOf('montanha')>-1||combinado.indexOf('topo')>-1||combinado.indexOf('altitude')>-1) cenario='dramatic mountain top with clouds below and golden sunset sky';
-  else if(combinado.indexOf('espa')>-1||combinado.indexOf('estrela')>-1||combinado.indexOf('planeta')>-1||combinado.indexOf('universo')>-1) cenario='magical outer space with colorful planets, sparkly stars and nebulas';
-  else if(combinado.indexOf('assombra')>-1||combinado.indexOf('fantasma')>-1||combinado.indexOf('halloween')>-1) cenario='spooky haunted house at night with glowing pumpkins, bats and purple moonlight';
+  // Cenario baseado no texto
+  var cenario='warm cozy indoors with soft pastel walls and fairy lights';
+  if(combinado.indexOf('quarto')>-1||combinado.indexOf('cama')>-1) cenario='cozy magical bedroom with glowing fairy lights, colorful pillows, soft warm light through curtains';
+  else if(combinado.indexOf('floresta')>-1||combinado.indexOf('mata')>-1||combinado.indexOf('arvore')>-1) cenario='enchanted forest with giant glowing trees, magical fireflies, soft green and golden light filtering through leaves';
+  else if(combinado.indexOf('castelo')>-1||combinado.indexOf('palacio')>-1) cenario='fairy tale castle hall with tall colorful banners, glowing magic windows, shiny stone floors';
+  else if(combinado.indexOf('praia')>-1||combinado.indexOf('mar')>-1||combinado.indexOf('ocean')>-1) cenario='sunny magical beach with crystal blue sea, colorful seashells, golden sand and gentle waves';
+  else if(combinado.indexOf('escola')>-1||combinado.indexOf('aula')>-1) cenario='cheerful bright classroom with colorful drawings on walls, rainbow desks and large windows with sunlight';
+  else if(combinado.indexOf('parque')>-1||combinado.indexOf('jardim')>-1||combinado.indexOf('quintal')>-1) cenario='colorful garden with blooming flowers, butterflies, green grass and a bright blue sky with fluffy clouds';
+  else if(combinado.indexOf('cozinha')>-1||combinado.indexOf('bolo')>-1||combinado.indexOf('comida')>-1) cenario='warm cozy kitchen with cakes and cookies on table, warm golden oven glow, colorful pots and pans';
+  else if(combinado.indexOf('ceu')>-1||combinado.indexOf('nuvem')>-1||combinado.indexOf('voar')>-1) cenario='magical sky with giant fluffy clouds, rainbow, golden sunlight and colorful hot air balloons in distance';
+  else if(combinado.indexOf('caverna')>-1||combinado.indexOf('escuro')>-1) cenario='mysterious glowing cave with colorful crystals on walls, dramatic shadows and magical light beams';
+  else if(combinado.indexOf('cidade')>-1||combinado.indexOf('rua')>-1) cenario='charming colorful street with small shops, flower pots on windows, cobblestones and warm afternoon light';
+  else if(combinado.indexOf('espaco')>-1||combinado.indexOf('estrela')>-1||combinado.indexOf('planeta')>-1) cenario='magical outer space with colorful planets, sparkly star clusters and swirling nebula clouds';
+  else if(combinado.indexOf('assombra')>-1||combinado.indexOf('fantasma')>-1) cenario='spooky haunted house at night with glowing pumpkins, bats flying, purple moonlight and twisted trees';
 
-  // Acao de interacao entre personagens
-  var nomesNaPg=parsNaPg.map(function(p){return p.nome;}).join(' and ');
+  // Acao entre personagens
   var acaoInteracao='';
   if(parsNaPg.length>1){
-    if(expressao.indexOf('hugging')>-1||expressao.indexOf('loving')>-1) acaoInteracao='hugging each other warmly, ';
+    if(expressao.indexOf('loving')>-1||expressao.indexOf('warm')>-1) acaoInteracao='hugging each other warmly, ';
     else if(expressao.indexOf('brave')>-1||expressao.indexOf('heroic')>-1) acaoInteracao='standing together bravely side by side, ';
     else if(expressao.indexOf('happy')>-1||expressao.indexOf('laughing')>-1) acaoInteracao='playing and laughing together, ';
-    else if(expressao.indexOf('scared')>-1) acaoInteracao='holding hands frightened, looking around cautiously, ';
-    else acaoInteracao='together in the scene, ';
+    else acaoInteracao='together in the scene interacting with each other, ';
   }
 
-  // FIX: descPersonagens declarado ANTES de usar no prompt
+  // Monta descricao dos personagens usando promptBase do avatar aprovado
   var descPersonagens='';
-  var primeiroAvatarUrl=null;
   for(var i=0;i<parsNaPg.length;i++){
     var par=parsNaPg[i];
     if(par.promptBase){
       descPersonagens+=par.nome+': '+par.promptBase+' ';
     } else {
-      descPersonagens+=par.nome+': adorable kawaii chibi character, ';
+      descPersonagens+=par.nome+': adorable kawaii chibi character with big sparkly eyes and rosy cheeks. ';
     }
-    if(!primeiroAvatarUrl&&par.avatarUrl) primeiroAvatarUrl=par.avatarUrl;
   }
 
-  var prompt='Squishbook illustrated children book. Scene '+(idx+1)+'. '
-    +'CHARACTERS (chibi Squishbook style, consistent with avatar): '+descPersonagens
-    +(acaoInteracao?acaoInteracao:'')
-    +'Emotion: '+expressao+'. '
-    +'SCENE BACKGROUND (detailed, immersive, fills most of the image): '+cenario+'. '
-    +'Characters are placed inside the scene, interacting with surroundings. '
-    +'Composition: background takes 60% of frame with depth and details, characters in foreground. '
-    +'Style: Squishbook signature art - chibi plush characters, oversized sparkly eyes, rosy cheeks, '
-    +'painterly watercolor background, warm pastel lighting, professional storybook quality. '
-    +'NO text, NO watermark, NO speech bubbles.';
+  // Prompt completo: personagem + cenario + acao
+  // USA flux/schnell DIRETO (sem image-to-image) para gerar cena completa com cenario
+  var prompt='Squishbook childrens book full scene illustration. '
+    +'SETTING (the most important part, fills the entire background): '+cenario+'. '
+    +'Rich detailed background with depth: foreground props, mid-ground characters, background atmosphere. '
+    +'CHARACTERS in this scene: '+descPersonagens
+    +acaoInteracao
+    +'Characters show emotion: '+expressao+'. '
+    +'Characters are placed INSIDE the setting, interacting with the environment. '
+    +'Art style: Squishbook signature - chibi plush characters with oversized sparkly eyes, chubby rosy cheeks, '
+    +'soft pastel watercolor background, warm magical lighting, painterly storybook illustration quality. '
+    +'Characters occupy about 40% of frame, rich scene fills 60%. '
+    +'NO text, NO watermark, NO speech bubbles, NO plain white background.';
 
   try{
-    // image-to-image: usa o avatar aprovado como base e gera a cena mantendo o personagem
-    // flux/dev/image-to-image mantem identidade visual do avatar na cena
-    var model= primeiroAvatarUrl ? 'fal-ai/flux/dev/image-to-image' : 'fal-ai/flux/schnell';
-    var body= primeiroAvatarUrl
-      ? {
-          prompt: prompt,
-          image_url: primeiroAvatarUrl,
-          num_inference_steps: 28,
-          strength: 0.85,
-          guidance_scale: 10,
-          num_images: 1,
-          image_size: 'landscape_4_3',
-          enable_safety_checker: true
-        }
-      : {prompt:prompt, num_images:1, image_size:'landscape_4_3', guidance_scale:7.5};
-    // Timeout de 45 segundos para nao travar infinitamente
+    // Sempre usa flux/schnell direto - liberdade total para gerar cena com cenario
+    var body={
+      prompt: prompt,
+      num_images: 1,
+      image_size: 'landscape_4_3',
+      num_inference_steps: 4
+    };
     var controller=new AbortController();
     var timeout=setTimeout(function(){controller.abort();},45000);
     var res=await fetch('https://squishbook-backend.onrender.com/api/avatar',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:model,payload:body}),
+      body:JSON.stringify({model:'fal-ai/flux/schnell',payload:body}),
       signal:controller.signal
     });
     clearTimeout(timeout);
