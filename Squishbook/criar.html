@@ -1320,35 +1320,29 @@ async function gerarCenaPagina(pg,idx){
     else acaoInteracao='together in the scene, ';
   }
 
-  var prompt='Squishbook children book illustration. '
-    +'CHARACTERS IN THIS SCENE (draw them EXACTLY as described, same style as their approved avatar): '
-    +descPersonagens
-    +acaoInteracao
-    +'Characters expression and mood: '+expressao+'. '
-    +'BACKGROUND SCENE (very important): '+cenario+'. '
-    +'The characters are placed IN the scene, interacting with the environment. '
-    +'The background is detailed and rich, not just a plain color - it tells part of the story. '
-    +'Art style: Squishbook signature style - ultra soft squishy plush doll characters, '
-    +'oversized glossy eyes with sparkle highlights, chubby round faces with rosy cheeks, '
-    +'pastel color palette, warm soft lighting, professional childrens book illustration quality, '
-    +'painterly background with depth and detail, characters in foreground. '
-    +'NO text, NO watermark, NO speech bubbles.';
-
-  // Monta prompt descrevendo cada personagem usando o promptBase salvo no avatar aprovado
-  // Isso garante que as cenas usem EXATAMENTE o mesmo personagem do passo 5
+  // FIX: descPersonagens declarado ANTES de usar no prompt
   var descPersonagens='';
   var primeiroAvatarUrl=null;
   for(var i=0;i<parsNaPg.length;i++){
     var par=parsNaPg[i];
     if(par.promptBase){
-      descPersonagens+=par.nome+' ('+par.nome+'): '+par.promptBase;
+      descPersonagens+=par.nome+': '+par.promptBase+' ';
     } else {
       descPersonagens+=par.nome+': adorable kawaii chibi character, ';
     }
     if(!primeiroAvatarUrl&&par.avatarUrl) primeiroAvatarUrl=par.avatarUrl;
   }
-  var refs=[];
-  if(primeiroAvatarUrl) refs.push({image_url:primeiroAvatarUrl});
+
+  var prompt='Squishbook illustrated children book. Scene '+(idx+1)+'. '
+    +'CHARACTERS (chibi Squishbook style, consistent with avatar): '+descPersonagens
+    +(acaoInteracao?acaoInteracao:'')
+    +'Emotion: '+expressao+'. '
+    +'SCENE BACKGROUND (detailed, immersive, fills most of the image): '+cenario+'. '
+    +'Characters are placed inside the scene, interacting with surroundings. '
+    +'Composition: background takes 60% of frame with depth and details, characters in foreground. '
+    +'Style: Squishbook signature art - chibi plush characters, oversized sparkly eyes, rosy cheeks, '
+    +'painterly watercolor background, warm pastel lighting, professional storybook quality. '
+    +'NO text, NO watermark, NO speech bubbles.';
 
   try{
     // image-to-image: usa o avatar aprovado como base e gera a cena mantendo o personagem
@@ -1359,13 +1353,13 @@ async function gerarCenaPagina(pg,idx){
           prompt: prompt,
           image_url: primeiroAvatarUrl,
           num_inference_steps: 28,
-          strength: 0.75,
-          guidance_scale: 3.5,
+          strength: 0.55,
+          guidance_scale: 7.5,
           num_images: 1,
           image_size: 'landscape_4_3',
           enable_safety_checker: true
         }
-      : {prompt:prompt, num_images:1, image_size:'landscape_4_3'};
+      : {prompt:prompt, num_images:1, image_size:'landscape_4_3', guidance_scale:7.5};
     // Timeout de 45 segundos para nao travar infinitamente
     var controller=new AbortController();
     var timeout=setTimeout(function(){controller.abort();},45000);
@@ -1766,52 +1760,96 @@ async function gerarPDF(){
 
 function gerarPDFFallback(){
   var proto=ST.personagens[0];
+  var roteiro=ST.roteiro||'aventura';
+  var paletas={
+    aventura:{bg1:'#0D1E6A',bg2:'#1B4FD8',bg3:'#7C3AED',pg1:'#FFF8F0',pg2:'#F0EAFF',acc:'#F4A02D',acc2:'#1B4FD8'},
+    amizade:{bg1:'#5B1A6E',bg2:'#D4537E',bg3:'#ED93B1',pg1:'#FFF0F5',pg2:'#FDE8FF',acc:'#D4537E',acc2:'#7F77DD'},
+    familia:{bg1:'#7C2D12',bg2:'#C2410C',bg3:'#F97316',pg1:'#FFFBEB',pg2:'#FFF7F0',acc:'#F97316',acc2:'#7C2D12'},
+    magia:{bg1:'#1E1B4B',bg2:'#4C1D95',bg3:'#7C3AED',pg1:'#F5F0FF',pg2:'#EDE9FE',acc:'#8B5CF6',acc2:'#4C1D95'},
+    animal:{bg1:'#14532D',bg2:'#166534',bg3:'#4ADE80',pg1:'#F0FDF4',pg2:'#F5FFED',acc:'#16A34A',acc2:'#14532D'},
+    sonho:{bg1:'#0C4A6E',bg2:'#0369A1',bg3:'#38BDF8',pg1:'#F0F9FF',pg2:'#E0F2FE',acc:'#0EA5E9',acc2:'#0C4A6E'},
+    terror:{bg1:'#1A0A2E',bg2:'#3B0764',bg3:'#7C3AED',pg1:'#1A0A2E',pg2:'#0F0520',acc:'#A855F7',acc2:'#EC4899'}
+  };
+  var pal=paletas[roteiro]||paletas.aventura;
+  var isTerror=roteiro==='terror';
+  var txColor=isTerror?'#E9D5FF':'#180F2E';
+  var decors=[
+    '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" style="position:absolute;top:8px;right:8px;opacity:.12"><circle cx="40" cy="40" r="38" fill="'+pal.acc+'"/></svg>',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" style="position:absolute;bottom:50px;left:0;opacity:.08"><polygon points="50,0 100,100 0,100" fill="'+pal.acc2+'"/></svg>',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="90" height="90" style="position:absolute;top:10px;right:10px;opacity:.1"><rect x="10" y="10" width="70" height="70" rx="16" fill="'+pal.acc+'"/></svg>',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" style="position:absolute;bottom:45px;right:5px;opacity:.09"><ellipse cx="40" cy="40" rx="38" ry="26" fill="'+pal.acc2+'"/></svg>',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" style="position:absolute;top:5px;left:5px;opacity:.09"><circle cx="50" cy="50" r="46" fill="'+pal.acc+'"/><circle cx="50" cy="50" r="30" fill="none" stroke="'+pal.acc2+'" stroke-width="4"/></svg>',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="90" height="90" style="position:absolute;bottom:50px;left:5px;opacity:.09"><polygon points="45,2 56,34 90,34 63,55 73,88 45,67 17,88 27,55 0,27 34,27" fill="'+pal.acc+'"/></svg>'
+  ];
+  var capasHtml='';
+  for(var i=0;i<Math.min(ST.personagens.length,4);i++){
+    var src=ST.personagens[i].avatarUrl||ST.personagens[i].fotoUrl;
+    if(src) capasHtml+='<div style="display:inline-block;margin:0 -6px"><img src="'+src+'" style="width:100px;height:100px;border-radius:50%;border:4px solid rgba(255,255,255,.5);object-fit:cover;box-shadow:0 6px 24px rgba(0,0,0,.4);display:block"/></div>';
+  }
   var pgsHtml='';
   for(var i=0;i<POS.cenasGeradas.length;i++){
     var cena=POS.cenasGeradas[i];
     var pg=cena.pg;
-    var dir=i%2===0?'row':'row-reverse';
+    var layout=i%3;
+    var bgCol=i%2===0?pal.pg1:pal.pg2;
+    var imgStyle='border-radius:20px;object-fit:cover;box-shadow:0 8px 32px rgba(0,0,0,.18);border:3px solid rgba(255,255,255,.9)';
     var imgTag=cena.url
-      ?'<img src="'+cena.url+'" style="width:130px;height:130px;border-radius:14px;object-fit:cover;flex-shrink:0;box-shadow:0 4px 16px rgba(0,0,0,.12)"/>'
-      :'<div style="width:130px;height:130px;border-radius:14px;background:linear-gradient(135deg,#C8D9FF,#EDE9FE);display:flex;align-items:center;justify-content:center;font-size:3rem;flex-shrink:0">\u2728</div>';
-    pgsHtml+='<div style="page-break-before:'+(i===0?'avoid':'always')+';padding:32px;display:flex;gap:24px;align-items:flex-start;flex-direction:'+dir+';background:'+(i%2===0?'#FFFBF5':'#F5F3FF')+'">'
-      +imgTag
-      +'<div style="flex:1"><div style="font-size:9px;font-weight:800;color:#1B4FD8;text-transform:uppercase;letter-spacing:.12em;margin-bottom:8px">Pagina '+(i+1)+'</div>'
-      +'<div style="font-size:14px;font-weight:800;color:#0D2E8A;margin-bottom:10px;line-height:1.3">'+(pg.titulo||'')+'</div>'
-      +'<div style="font-size:12px;color:#180F2E;line-height:1.85;font-style:italic">'+(pg.texto||'').replace(/\n/g,'<br/>')+'</div>'
+      ?'<img src="'+cena.url+'" style="'+imgStyle+'"/>'
+      :'<div style="'+imgStyle+';background:linear-gradient(135deg,'+pal.bg2+','+pal.bg3+');display:flex;align-items:center;justify-content:center;font-size:4rem">*</div>';
+    var numBadge='<div style="display:inline-flex;align-items:center;background:'+pal.acc+';color:white;font-size:9px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;padding:5px 16px;border-radius:20px;margin-bottom:14px;box-shadow:0 2px 8px rgba(0,0,0,.15)">Pagina '+(i+1)+'</div>';
+    var tituloDiv='<div style="font-family:\'Baloo 2\',cursive;font-size:19px;font-weight:900;color:'+pal.acc2+';margin-bottom:16px;line-height:1.2">'+(pg.titulo||'')+'</div>';
+    var textoDiv='<div style="font-size:13px;color:'+txColor+';line-height:2.1;font-style:italic">'+(pg.texto||'').replace(/\n\n/g,"<br/><br/>").replace(/\n/g,"<br/>")+'</div>';
+    var pageContent;
+    if(layout===0){
+      imgTag=imgTag.replace(imgStyle,imgStyle+';width:210px;height:210px;flex-shrink:0');
+      pageContent='<div style="display:flex;gap:28px;align-items:flex-start">'+imgTag+'<div style="flex:1">'+numBadge+tituloDiv+textoDiv+'</div></div>';
+    } else if(layout===1){
+      imgTag=imgTag.replace(imgStyle,imgStyle+';width:100%;height:230px');
+      pageContent=imgTag+'<div style="margin-top:22px">'+numBadge+tituloDiv+textoDiv+'</div>';
+    } else {
+      imgTag=imgTag.replace(imgStyle,imgStyle+';width:210px;height:210px;flex-shrink:0');
+      pageContent='<div style="display:flex;flex-direction:row-reverse;gap:28px;align-items:flex-start">'+imgTag+'<div style="flex:1">'+numBadge+tituloDiv+textoDiv+'</div></div>';
+    }
+    pgsHtml+='<div style="page-break-before:always;min-height:100vh;background:'+bgCol+';padding:38px 42px 56px;position:relative;overflow:hidden">'
+      +decors[i%6]
+      +'<div style="position:relative;z-index:1">'+pageContent+'</div>'
+      +'<div style="position:absolute;bottom:0;left:0;right:0;height:36px;background:linear-gradient(90deg,'+pal.bg1+','+pal.bg2+');display:flex;align-items:center;justify-content:center">'
+      +'<span style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:.2em;text-transform:uppercase">Squishbook</span>'
       +'</div></div>';
   }
-  var capasHtml='';
-  for(var i=0;i<Math.min(ST.personagens.length,4);i++){
-    var src=ST.personagens[i].avatarUrl||ST.personagens[i].fotoUrl;
-    if(src) capasHtml+='<img src="'+src+'" style="width:90px;height:90px;border-radius:50%;border:3px solid rgba(255,255,255,.4);margin:0 -8px;object-fit:cover;box-shadow:0 4px 16px rgba(0,0,0,.3)"/>';
-  }
-  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"/>'
-    +'<title>Squishbook - '+ST.historia.titulo+'</title>'
-    +'<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&family=Baloo+2:wght@800&display=swap" rel="stylesheet"/>'
+  var bookHtml='<!DOCTYPE html><html><head><meta charset="UTF-8"/>'
+    +'<title>'+ST.historia.titulo+'</title>'
+    +'<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&family=Baloo+2:wght@700;800;900&display=swap" rel="stylesheet"/>'
     +'<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Nunito,sans-serif}'
-    +'@media print{@page{size:A5 portrait;margin:0}.no-print{display:none!important}}'
+    +'@media print{@page{size:A5 portrait;margin:0}.no-print{display:none!important}html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}'
     +'</style></head><body>'
-    +'<div style="page-break-after:always;min-height:100vh;background:linear-gradient(150deg,#0D1E6A,#2D3DAA,#7C3AED);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px;text-align:center">'
-    +'<div style="font-size:11px;color:rgba(255,255,255,.4);letter-spacing:.2em;text-transform:uppercase;margin-bottom:16px">Squishbook</div>'
-    +'<div style="font-size:26px;font-weight:900;color:white;margin-bottom:10px;line-height:1.2">'+ST.historia.titulo+'</div>'
-    +'<div style="font-size:13px;color:rgba(255,255,255,.65);margin-bottom:32px">Uma historia criada para '+proto.nome+' \u2764\uFE0F</div>'
-    +(capasHtml?'<div style="display:flex;justify-content:center;margin-bottom:32px">'+capasHtml+'</div>':'')
-    +'<div style="font-size:11px;color:rgba(255,255,255,.3)">Um presente unico no mundo</div>'
-    +'</div>'
+    +'<div style="page-break-after:always;min-height:100vh;background:linear-gradient(150deg,'+pal.bg1+' 0%,'+pal.bg2+' 55%,'+pal.bg3+' 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 36px;text-align:center;position:relative;overflow:hidden">'
+    +'<div style="position:absolute;top:-100px;right:-100px;width:340px;height:340px;border-radius:50%;background:rgba(255,255,255,.07)"></div>'
+    +'<div style="position:absolute;bottom:-80px;left:-80px;width:260px;height:260px;border-radius:50%;background:rgba(255,255,255,.04)"></div>'
+    +'<div style="position:relative;z-index:1;width:100%">'
+    +'<div style="display:inline-block;background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.22);border-radius:20px;padding:6px 22px;font-size:10px;color:rgba(255,255,255,.75);letter-spacing:.22em;text-transform:uppercase;margin-bottom:28px">Squishbook</div>'
+    +'<div style="font-family:\'Baloo 2\',cursive;font-size:34px;font-weight:900;color:white;margin-bottom:14px;line-height:1.15;text-shadow:0 4px 28px rgba(0,0,0,.35)">'+ST.historia.titulo+'</div>'
+    +'<div style="font-size:13px;color:rgba(255,255,255,.65);margin-bottom:38px">Uma historia criada especialmente para <strong style="color:white">'+proto.nome+'</strong></div>'
+    +(capasHtml?'<div style="display:flex;justify-content:center;align-items:center;margin-bottom:42px">'+capasHtml+'</div>':'')
+    +'<div style="width:64px;height:3px;background:rgba(255,255,255,.3);border-radius:2px;margin:0 auto 24px"></div>'
+    +'<div style="font-size:11px;color:rgba(255,255,255,.32);letter-spacing:.14em;text-transform:uppercase">Um presente unico no mundo</div>'
+    +'</div></div>'
     +pgsHtml
-    +'<div style="page-break-before:always;min-height:100vh;background:linear-gradient(150deg,#0D1E6A,#7C3AED);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px;text-align:center">'
-    +'<div style="font-size:3rem;margin-bottom:20px">\uD83D\uDC96</div>'
-    +'<div style="font-size:24px;font-weight:900;color:white;margin-bottom:24px">Fim</div>'
-    +(POS.mensagem?'<div style="font-size:13px;color:rgba(255,255,255,.8);font-style:italic;max-width:280px;line-height:1.8;margin-bottom:24px">&ldquo;'+POS.mensagem+'&rdquo;</div>':'')
-    +'<div style="font-size:11px;color:rgba(255,255,255,.35)">Squishbook \u2014 Feito com amor pelo Benicio, 6 anos</div>'
-    +'</div>'
+    +'<div style="page-break-before:always;min-height:100vh;background:linear-gradient(150deg,'+pal.bg1+','+pal.bg3+');display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px;text-align:center;position:relative;overflow:hidden">'
+    +'<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:420px;height:420px;border-radius:50%;background:rgba(255,255,255,.04)"></div>'
+    +'<div style="position:relative;z-index:1">'
+    +'<div style="font-size:4rem;margin-bottom:24px">&hearts;</div>'
+    +'<div style="font-family:\'Baloo 2\',cursive;font-size:30px;font-weight:900;color:white;margin-bottom:28px">Fim</div>'
+    +(POS.mensagem?'<div style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:20px;padding:24px 30px;max-width:320px;margin:0 auto 28px"><div style="font-size:13px;color:rgba(255,255,255,.88);font-style:italic;line-height:1.95">&ldquo;'+POS.mensagem+'&rdquo;</div></div>':'')
+    +'<div style="font-size:12px;color:rgba(255,255,255,.42);line-height:1.9">Este livro foi criado com amor<br/>especialmente para <strong style="color:rgba(255,255,255,.72)">'+proto.nome+'</strong>.</div>'
+    +'<div style="margin-top:32px;font-size:10px;color:rgba(255,255,255,.22);letter-spacing:.18em;text-transform:uppercase">Squishbook</div>'
+    +'</div></div>'
     +'<div class="no-print" style="position:fixed;bottom:24px;right:24px;display:flex;gap:12px;z-index:9999">'
-    +'<button onclick="window.print()" style="background:linear-gradient(135deg,#E8527A,#7C3AED);color:white;border:none;padding:14px 32px;border-radius:50px;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 6px 24px rgba(232,82,122,.4)">\uD83D\uDDA8\uFE0F Salvar PDF</button>'
+    +'<button onclick="window.print()" style="background:linear-gradient(135deg,'+pal.bg2+','+pal.bg3+');color:white;border:none;padding:14px 32px;border-radius:50px;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 6px 24px rgba(0,0,0,.3)">Salvar PDF</button>'
     +'<button onclick="window.close()" style="background:white;color:#180F2E;border:2px solid #EDE8F8;padding:14px 24px;border-radius:50px;font-size:15px;font-weight:800;cursor:pointer">Fechar</button>'
     +'</div></body></html>';
-  var w=window.open('','_blank','width=650,height=900');
-  if(w){w.document.write(html);w.document.close();setTimeout(function(){w.print();},1800);}
+  var w=window.open('','_blank','width=680,height=960');
+  if(w){w.document.write(bookHtml);w.document.close();setTimeout(function(){w.print();},2200);}
 }
 
 function carregarImagem(url){
