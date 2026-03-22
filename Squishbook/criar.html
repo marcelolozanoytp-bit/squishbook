@@ -1351,12 +1351,21 @@ async function gerarCenaPagina(pg,idx){
   if(primeiroAvatarUrl) refs.push({image_url:primeiroAvatarUrl});
 
   try{
-    // Usa flux/schnell com avatarUrl como referencia de imagem (image_url)
-    // O modelo mantem consistencia de estilo visual com o avatar aprovado
-    var model='fal-ai/flux/schnell';
-    var body=primeiroAvatarUrl
-      ?{prompt:prompt,image_url:primeiroAvatarUrl,num_images:1,image_size:'landscape_4_3',strength:0.85}
-      :{prompt:prompt,num_images:1,image_size:'landscape_4_3'};
+    // image-to-image: usa o avatar aprovado como base e gera a cena mantendo o personagem
+    // flux/dev/image-to-image mantem identidade visual do avatar na cena
+    var model= primeiroAvatarUrl ? 'fal-ai/flux/dev/image-to-image' : 'fal-ai/flux/schnell';
+    var body= primeiroAvatarUrl
+      ? {
+          prompt: prompt,
+          image_url: primeiroAvatarUrl,
+          num_inference_steps: 28,
+          strength: 0.75,
+          guidance_scale: 3.5,
+          num_images: 1,
+          image_size: 'landscape_4_3',
+          enable_safety_checker: true
+        }
+      : {prompt:prompt, num_images:1, image_size:'landscape_4_3'};
     // Timeout de 45 segundos para nao travar infinitamente
     var controller=new AbortController();
     var timeout=setTimeout(function(){controller.abort();},45000);
