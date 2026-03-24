@@ -660,20 +660,20 @@ function buildPrompt(est, proto, outros, tema, listaP, instrP){
     p += 'Tema: ' + tema + '\n';
     p += 'Tom: ' + tomRoteiro + '\n\n';
     p += instrP + '\n\n';
-    p += 'COMO ESCREVER CADA PAGINA:\n';
-    p += 'Frase 1: Acao ou cena descrita com 1 detalhe sensorial marcante (cor, som, cheiro, textura)\n';
-    p += 'Frase 2: Reacao emocional do protagonista OU fala direta de um personagem entre aspas\n';
-    p += 'Use o nome dos personagens em quase todas as paginas.\n';
-    p += 'Onomatopeias sao bem-vindas (SPLASH! CRASH! ZAP!) quando fazem sentido.\n\n';
+    p += 'COMO ESCREVER CADA PAGINA (OBRIGATORIO - minimo 3 frases ricas por pagina):\n';
+    p += 'Frase 1: Cena VIVA com detalhe sensorial unico (cor, som, cheiro, textura, temperatura)\n';
+    p += 'Frase 2: Onomatopeia + acao (SPLASH! CRACK! WHOOSH! GRRR! TUM-TUM!) criativo e especifico\n';
+    p += 'Frase 3: Fala direta entre aspas OU reacao emocional intensa do personagem\n';
+    p += 'Use o nome dos personagens em quase todas as paginas. PROIBIDO textos genericos.\n\n';
     p += 'ARCO DAS 6 PAGINAS:\n';
-    p += 'Pag 1: Cena inicial que apresenta o protagonista em seu mundo\n';
-    p += 'Pag 2: Algo muda, surpresa ou chamado para aventura\n';
-    p += 'Pag 3: Desafio ou obstaculo real aparece\n';
-    p += 'Pag 4: Momento de duvida ou perigo maximo\n';
-    p += 'Pag 5: Virada, o protagonista age com coragem ou criatividade\n';
-    p += 'Pag 6: Resolucao emocionante, todos juntos, frase final que fica na memoria\n\n';
+    p += 'Pag 1: Cena inicial VIVA - protagonista em acao unica, detalhe que mostra personalidade\n';
+    p += 'Pag 2: Mudanca DRAMATICA - surpresa, barulho, descoberta inesperada e especifica\n';
+    p += 'Pag 3: Desafio REAL com obstaculo concreto, emocao verdadeira\n';
+    p += 'Pag 4: Perigo maximo - tensao alta, o pior momento da historia\n';
+    p += 'Pag 5: Virada corajosa - protagonista age de forma unica e inesperada\n';
+    p += 'Pag 6: Resolucao EMOCIONANTE com frase final que o leitor vai querer repetir\n\n';
     p += 'Responda APENAS com este JSON (sem markdown, sem explicacoes):\n';
-    p += '{"titulo":"Titulo curto e memoravel que a crianca vai querer repetir","emoji":"emoji que representa a historia","paginas":[{"num":1,"titulo":"Titulo evocativo da pagina","texto":"Frase 1 com detalhe sensorial.\\n\\nFrase 2 com emocao ou fala."},{"num":2,"titulo":"Titulo","texto":"Frase 1.\\n\\nFrase 2."},{"num":3,"titulo":"Titulo","texto":"Frase 1.\\n\\nFrase 2."},{"num":4,"titulo":"Titulo","texto":"Frase 1.\\n\\nFrase 2."},{"num":5,"titulo":"Titulo","texto":"Frase 1.\\n\\nFrase 2."},{"num":6,"titulo":"Titulo","texto":"Frase 1.\\n\\nFrase 2."}]}';
+    p += '{"titulo":"Titulo memoravel e especifico","emoji":"emoji perfeito","paginas":[{"num":1,"titulo":"Titulo evocativo","texto":"Frase 1 sensorial.\\n\\nFrase 2 com onomatopeia.\\n\\nFrase 3 emocional."},{"num":2,"titulo":"Titulo","texto":"Frase 1.\\n\\nFrase 2.\\n\\nFrase 3."},{"num":3,"titulo":"Titulo","texto":"Frase 1.\\n\\nFrase 2.\\n\\nFrase 3."},{"num":4,"titulo":"Titulo","texto":"Frase 1.\\n\\nFrase 2.\\n\\nFrase 3."},{"num":5,"titulo":"Titulo","texto":"Frase 1.\\n\\nFrase 2.\\n\\nFrase 3."},{"num":6,"titulo":"Titulo","texto":"Frase 1.\\n\\nFrase 2.\\n\\nFrase 3."}]}';
   } else {
     p = 'Voce e um dos maiores autores brasileiros de literatura infantil. Voce conhece o segredo das historias que ficam para sempre: personagens reais, emocoes verdadeiras, e um fio narrativo que prende do inicio ao fim.\n\n';
     p += 'Esta historia sera impressa e dada de presente. Ela precisa ser boa o suficiente para a pessoa guardar pelo resto da vida.\n\n';
@@ -1719,29 +1719,32 @@ function gerarPDFFallback(){
       imgTag=imgTag.replace(imgStyle,imgStyle+';width:210px;height:210px;flex-shrink:0');
       pageContent='<div style="display:flex;flex-direction:row-reverse;gap:28px;align-items:flex-start">'+imgTag+'<div style="flex:1">'+numBadge+tituloDiv+textoDiv+'</div></div>';
     }
-    pgsHtml+='<div style="page-break-before:always;background:'+bgCol+';padding:38px 42px 48px;position:relative;overflow:hidden">'
+    pgsHtml+='<div class="pg" style="background:'+bgCol+';padding:36px 40px 44px;position:relative;overflow:hidden">'
       +decors[i%6]
       +'<div style="position:relative;z-index:1">'+pageContent+'</div>'
       +'<div style="position:absolute;bottom:0;left:0;right:0;height:36px;background:linear-gradient(90deg,'+pal.bg1+','+pal.bg2+');display:flex;align-items:center;justify-content:center">'
       +'<span style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:.2em;text-transform:uppercase">Squishbook</span>'
       +'</div></div>';
   }
+  var titFontSize=ST.historia.titulo.length>25?'28px':'34px';
   var bookHtml='<!DOCTYPE html><html><head><meta charset="UTF-8"/>'
     +'<title>'+ST.historia.titulo+'</title>'
+    +'<link rel="preconnect" href="https://fonts.googleapis.com"/>'
+    +'<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>'
     +'<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&family=Baloo+2:wght@700;800;900&display=block" rel="stylesheet"/>'
-    +'<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Nunito,sans-serif}'
-    +'@media print{@page{size:A5 portrait;margin:0}.no-print{display:none!important}html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}'
-    +'</style></head><body>'
-    +'<div style="page-break-after:always;min-height:100vh;background:linear-gradient(150deg,'+pal.bg1+' 0%,'+pal.bg2+' 55%,'+pal.bg3+' 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 36px;text-align:center;position:relative;overflow:hidden">'
-    +'<div style="position:absolute;top:-100px;right:-100px;width:340px;height:340px;border-radius:50%;background:rgba(255,255,255,.07)"></div>'
-    +'<div style="position:absolute;bottom:-80px;left:-80px;width:260px;height:260px;border-radius:50%;background:rgba(255,255,255,.04)"></div>'
+    +'<style>*{margin:0;padding:0;box-sizing:border-box}html{-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:Nunito,sans-serif}@media print{@page{size:A5 portrait;margin:0}.no-print{display:none!important}.pg{page-break-after:always;page-break-inside:avoid}.pg:last-of-type{page-break-after:auto}}</style></head><body>'
+    +'<div style="page-break-after:always;min-height:100vh;background:linear-gradient(160deg,'+pal.bg1+' 0%,'+pal.bg2+' 45%,'+pal.bg3+' 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:44px 32px;text-align:center;position:relative;overflow:hidden">'
+    +'<div style="position:absolute;top:-120px;right:-120px;width:400px;height:400px;border-radius:50%;background:rgba(255,255,255,.06)"></div>'
+    +'<div style="position:absolute;bottom:-100px;left:-100px;width:320px;height:320px;border-radius:50%;background:rgba(255,255,255,.04)"></div>'
+    +'<div style="position:absolute;top:28px;left:28px;width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.07)"></div>'
     +'<div style="position:relative;z-index:1;width:100%">'
-    +'<div style="display:inline-block;background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.22);border-radius:20px;padding:6px 22px;font-size:10px;color:rgba(255,255,255,.75);letter-spacing:.22em;text-transform:uppercase;margin-bottom:28px">Squishbook</div>'
-    +'<div style="font-family:\'Baloo 2\',\'Arial Black\',\'Arial Rounded MT Bold\',sans-serif;font-size:34px;font-weight:900;color:white;margin-bottom:14px;line-height:1.15;text-shadow:0 4px 28px rgba(0,0,0,.35)">'+ST.historia.titulo+'</div>'
-    +'<div style="font-size:13px;color:rgba(255,255,255,.65);margin-bottom:38px">Uma historia criada especialmente para <strong style="color:white">'+proto.nome+'</strong></div>'
-    +(capasHtml?'<div style="display:flex;justify-content:center;align-items:center;margin-bottom:42px">'+capasHtml+'</div>':'')
-    +'<div style="width:64px;height:3px;background:rgba(255,255,255,.3);border-radius:2px;margin:0 auto 24px"></div>'
-    +'<div style="font-size:11px;color:rgba(255,255,255,.32);letter-spacing:.14em;text-transform:uppercase">Um presente unico no mundo</div>'
+    +'<div style="display:inline-block;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:30px;padding:5px 20px;font-size:9px;color:rgba(255,255,255,.8);letter-spacing:.28em;text-transform:uppercase;margin-bottom:20px">Squishbook</div>'
+    +(capasHtml?'<div style="display:flex;justify-content:center;align-items:flex-end;margin-bottom:18px">'+capasHtml+'</div>':'')
+    +'<div style="font-family:\'Baloo 2\',\'Arial Black\',sans-serif;font-size:'+titFontSize+';font-weight:900;color:white;margin-bottom:10px;line-height:1.15;text-shadow:0 4px 32px rgba(0,0,0,.5)">'+ST.historia.titulo+'</div>'
+    +'<div style="width:80px;height:2px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.6),transparent);margin:10px auto"></div>'
+    +'<div style="font-size:11px;color:rgba(255,255,255,.65);margin-bottom:5px">Uma historia criada especialmente para</div>'
+    +'<div style="font-size:22px;font-weight:900;color:white;font-family:\'Baloo 2\',sans-serif;text-shadow:0 2px 16px rgba(0,0,0,.3)">'+proto.nome+'</div>'
+    +'<div style="margin-top:26px;font-size:9px;color:rgba(255,255,255,.28);letter-spacing:.2em;text-transform:uppercase">Um presente unico no mundo</div>'
     +'</div></div>'
     +pgsHtml
     +'<div style="page-break-before:always;min-height:100vh;background:linear-gradient(150deg,'+pal.bg1+','+pal.bg3+');display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px;text-align:center;position:relative;overflow:hidden">'
@@ -1758,7 +1761,7 @@ function gerarPDFFallback(){
     +'<button onclick="window.close()" style="background:white;color:#180F2E;border:2px solid #EDE8F8;padding:14px 24px;border-radius:50px;font-size:15px;font-weight:800;cursor:pointer">Fechar</button>'
     +'</div></body></html>';
   var w=window.open('','_blank','width=680,height=960');
-  if(w){w.document.write(bookHtml);w.document.close();document.fonts.ready.then(function(){setTimeout(function(){w.print();},800);});}
+  if(w){w.document.write(bookHtml);w.document.close();document.fonts.ready.then(function(){setTimeout(function(){w.print();},2000);});}
 }
 
 function carregarImagem(url){
