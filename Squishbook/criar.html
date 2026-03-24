@@ -1383,7 +1383,6 @@ async function gerarCenaPagina(pg,idx){
   }
 
   var prompt=(interacaoFisica?interacaoFisica:'')
-    +(primeiroAvatarUrl?'CRITICAL: main character face MUST match the reference photo - same hair, skin tone, facial features. ':'')
     +'Squishbook childrens book full illustrated scene. '
     +atmosfera
     +'BACKGROUND SETTING (fills entire image, very detailed and immersive): '+cenario+'. '
@@ -1405,9 +1404,8 @@ async function gerarCenaPagina(pg,idx){
         reference_image_url: primeiroAvatarUrl,
         num_images: 1,
         image_size: 'square_hd',
-        guidance_scale: 8,
-        num_inference_steps: 25,
-        id_scale: 0.8
+        guidance_scale: 4,
+        num_inference_steps: 20
       };
     } else {
       model='fal-ai/flux/schnell';
@@ -1700,7 +1698,7 @@ function gerarPDFFallback(){
       imgTag=imgTag.replace(imgStyle,imgStyle+';width:210px;height:210px;flex-shrink:0');
       pageContent='<div style="display:flex;flex-direction:row-reverse;gap:28px;align-items:flex-start">'+imgTag+'<div style="flex:1">'+numBadge+tituloDiv+textoDiv+'</div></div>';
     }
-    pgsHtml+='<div style="page-break-before:always;background:'+bgCol+';padding:38px 42px 48px;position:relative;overflow:hidden">'
+    pgsHtml+='<div style="page-break-before:always;page-break-inside:avoid;background:'+bgCol+';padding:36px 40px 44px;position:relative;overflow:hidden">'
       +decors[i%6]
       +'<div style="position:relative;z-index:1">'+pageContent+'</div>'
       +'<div style="position:absolute;bottom:0;left:0;right:0;height:36px;background:linear-gradient(90deg,'+pal.bg1+','+pal.bg2+');display:flex;align-items:center;justify-content:center">'
@@ -1712,7 +1710,7 @@ function gerarPDFFallback(){
     +'<link rel="preconnect" href="https://fonts.googleapis.com"/>'
     +'<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>'
     +'<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&family=Baloo+2:wght@700;800;900&display=block" rel="stylesheet"/>'
-    +'<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Nunito,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}@media print{@page{size:A5 portrait;margin:0}.no-print{display:none!important}div{page-break-inside:avoid}}</style></head><body>'
+    +'<style>*{margin:0;padding:0;box-sizing:border-box}html,body{font-family:Nunito,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact;height:auto}@media print{@page{size:A5 portrait;margin:0}.no-print{display:none!important}}</style></head><body>'
     +'<div style="page-break-after:always;min-height:100vh;background:linear-gradient(150deg,'+pal.bg1+' 0%,'+pal.bg2+' 55%,'+pal.bg3+' 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 36px;text-align:center;position:relative;overflow:hidden">'
     +'<div style="position:absolute;top:-100px;right:-100px;width:340px;height:340px;border-radius:50%;background:rgba(255,255,255,.07)"></div>'
     +'<div style="position:absolute;bottom:-80px;left:-80px;width:260px;height:260px;border-radius:50%;background:rgba(255,255,255,.04)"></div>'
