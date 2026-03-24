@@ -1403,13 +1403,13 @@ async function gerarCenaPagina(pg,idx){
         prompt: prompt,
         reference_image_url: primeiroAvatarUrl,
         num_images: 1,
-        image_size: 'landscape_4_3',
+        image_size: 'square_hd',
         guidance_scale: 6,
         num_inference_steps: 20
       };
     } else {
       model='fal-ai/flux/schnell';
-      body={prompt:prompt,num_images:1,image_size:'landscape_4_3',num_inference_steps:4};
+      body={prompt:prompt,num_images:1,image_size:'square_hd',num_inference_steps:4};
     }
     var controller=new AbortController();
     var timeout=setTimeout(function(){controller.abort();},55000);
