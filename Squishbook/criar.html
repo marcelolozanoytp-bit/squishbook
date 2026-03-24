@@ -1279,153 +1279,174 @@ async function gerarCenaPagina(pg,idx){
   var textoLower=(pg.texto||'').toLowerCase();
   var tituloLower=(pg.titulo||'').toLowerCase();
   var combinado=textoLower+' '+tituloLower;
-
-  var expressao='joyful and curious, smiling warmly';
-  if(combinado.indexOf('assust')>-1||combinado.indexOf('medo')>-1||combinado.indexOf('terror')>-1) expressao='scared but brave, wide eyes, slightly trembling';
-  else if(combinado.indexOf('triste')>-1||combinado.indexOf('chor')>-1||combinado.indexOf('lagrima')>-1) expressao='sad and emotional, teary eyes, pouting lip';
-  else if(combinado.indexOf('alegr')>-1||combinado.indexOf('feliz')>-1||combinado.indexOf('sorri')>-1||combinado.indexOf('riu')>-1) expressao='very happy, big beaming smile, eyes sparkling with joy';
-  else if(combinado.indexOf('corag')>-1||combinado.indexOf('heroi')>-1||combinado.indexOf('brav')>-1) expressao='brave and determined, confident heroic stance';
-  else if(combinado.indexOf('abraco')>-1||combinado.indexOf('amor')>-1||combinado.indexOf('juntos')>-1) expressao='warm and loving, arms open for a hug';
-  else if(combinado.indexOf('surpres')>-1||combinado.indexOf('espant')>-1) expressao='amazed and surprised, mouth open wide, hands on cheeks';
-  else if(combinado.indexOf('dormi')>-1||combinado.indexOf('sonho')>-1||combinado.indexOf('noite')>-1) expressao='sleepy and dreamy, soft half-closed eyes';
-  else if(combinado.indexOf('raiva')>-1||combinado.indexOf('zangad')>-1) expressao='upset and stubborn, arms crossed';
-  else if(combinado.indexOf('corr')>-1||combinado.indexOf('pul')>-1||combinado.indexOf('brinc')>-1) expressao='excited and playful, jumping with arms wide open';
-
-  var cenario='warm cozy living room with soft sofa, family photos on wall, fireplace and colorful rugs';
-  if(combinado.indexOf('quarto')>-1||combinado.indexOf('cama')>-1) cenario='cozy magical bedroom with glowing fairy lights on ceiling, colorful soft pillows, moonlight through curtains, stuffed animals on shelves';
-  else if(combinado.indexOf('floresta')>-1||combinado.indexOf('mata')>-1||combinado.indexOf('arvore')>-1) cenario='enchanted forest with giant glowing trees, magical fireflies, golden light filtering through leaves, mushrooms and flowers on the ground';
-  else if(combinado.indexOf('castelo')>-1||combinado.indexOf('palacio')>-1) cenario='fairy tale castle interior with tall colorful banners, glowing magic windows, shiny stone floors and grand staircase';
-  else if(combinado.indexOf('praia')>-1||combinado.indexOf('mar')>-1||combinado.indexOf('ocean')>-1) cenario='sunny magical beach with crystal blue sea, colorful seashells on golden sand, gentle waves and bright sunny sky';
-  else if(combinado.indexOf('escola')>-1||combinado.indexOf('aula')>-1) cenario='cheerful bright classroom with rainbow-colored desks, drawings on chalkboard and large windows with golden sunlight';
-  else if(combinado.indexOf('parque')>-1||combinado.indexOf('jardim')>-1||combinado.indexOf('quintal')>-1) cenario='magical colorful garden with giant blooming flowers, butterflies, green rolling grass hills and bright blue sky with fluffy clouds';
-  else if(combinado.indexOf('cozinha')>-1||combinado.indexOf('bolo')>-1) cenario='warm cozy kitchen with freshly baked cakes on table, golden oven glow and colorful pots hanging on wall';
-  else if(combinado.indexOf('ceu')>-1||combinado.indexOf('nuvem')>-1||combinado.indexOf('voar')>-1) cenario='magical sky scene on giant fluffy clouds, rainbow in background, golden sunlight, colorful hot air balloons floating nearby';
-  else if(combinado.indexOf('caverna')>-1||combinado.indexOf('escuro')>-1) cenario='mysterious glowing cave with giant colorful crystals on walls, dramatic shadows and magical blue light beams';
-  else if(combinado.indexOf('cidade')>-1||combinado.indexOf('rua')>-1) cenario='charming colorful storybook street with small shops, flower pots on windowsills, cobblestones and warm golden afternoon light';
-  else if(combinado.indexOf('espaco')>-1||combinado.indexOf('estrela')>-1||combinado.indexOf('planeta')>-1) cenario='magical outer space with colorful planets, sparkly star clusters, swirling nebula clouds and giant glowing moon';
-  else if(combinado.indexOf('assombra')>-1||combinado.indexOf('fantasma')>-1) cenario='spooky haunted mansion at night with glowing jack-o-lanterns, bats flying, purple moonlight and twisted bare trees';
-  else if(combinado.indexOf('montanha')>-1||combinado.indexOf('topo')>-1) cenario='dramatic mountain top with golden treasure chests, clouds below, epic sunset sky with golden and purple hues';
-
-  // Monta descricao de TODOS os personagens na cena
-  var descPersonagens='';
-  var primeiroAvatarUrl=null;
-  for(var i=0;i<parsNaPg.length;i++){
-    var par=parsNaPg[i];
-    var roleDesc=par.papel==='protagonista'?'main character child':par.papel==='familiar'?'adult family member':par.papel==='amigo'?'child friend':par.papel==='pet'?'cute pet animal':'character';
-    if(par.promptBase){
-      descPersonagens+=(i>0?'SECOND CHARACTER ':'CHARACTER ')+'('+roleDesc+'): '+par.promptBase+' ';
-    } else {
-      descPersonagens+=(i>0?'SECOND CHARACTER ':'CHARACTER ')+'('+roleDesc+'): adorable kawaii chibi with big sparkly eyes and rosy cheeks. ';
-    }
-    if(!primeiroAvatarUrl&&par.avatarUrl) primeiroAvatarUrl=par.avatarUrl;
-  }
-
-  // Acao entre personagens
-  var acaoInteracao='';
-  if(parsNaPg.length>1){
-    if(combinado.indexOf('abraco')>-1||combinado.indexOf('juntos')>-1||combinado.indexOf('amor')>-1) acaoInteracao='They are hugging each other warmly. ';
-    else if(combinado.indexOf('corag')>-1||combinado.indexOf('heroi')>-1) acaoInteracao='They are standing bravely side by side together. ';
-    else if(combinado.indexOf('corr')>-1||combinado.indexOf('brinc')>-1||combinado.indexOf('pul')>-1) acaoInteracao='They are playing and running together joyfully. ';
-    else if(combinado.indexOf('assust')>-1||combinado.indexOf('medo')>-1) acaoInteracao='They are holding hands, looking scared but brave together. ';
-    else acaoInteracao='They are together in the scene, interacting naturally with each other. ';
-  }
-
-  // Atmosfera global por roteiro — define lighting, mood e paleta da cena inteira
   var roteiro=ST.roteiro||'aventura';
+
+  // Expressão baseada no texto
+  var expressao='joyful and curious';
+  if(combinado.indexOf('assust')>-1||combinado.indexOf('medo')>-1||combinado.indexOf('terror')>-1) expressao='scared but brave';
+  else if(combinado.indexOf('triste')>-1||combinado.indexOf('chor')>-1) expressao='sad and emotional';
+  else if(combinado.indexOf('alegr')>-1||combinado.indexOf('feliz')>-1||combinado.indexOf('sorri')>-1) expressao='very happy, big smile';
+  else if(combinado.indexOf('corag')>-1||combinado.indexOf('heroi')>-1) expressao='brave and determined';
+  else if(combinado.indexOf('surpres')>-1||combinado.indexOf('espant')>-1) expressao='amazed and surprised';
+  else if(combinado.indexOf('dormi')>-1||combinado.indexOf('sonho')>-1) expressao='sleepy and dreamy';
+  else if(combinado.indexOf('corr')>-1||combinado.indexOf('brinc')>-1) expressao='excited and playful';
+
+  // Cenário
+  var cenario='warm cozy living room with soft sofa, family photos on wall, fireplace and colorful rugs';
+  if(combinado.indexOf('quarto')>-1||combinado.indexOf('cama')>-1) cenario='cozy magical bedroom with glowing fairy lights, colorful pillows, moonlight through curtains, stuffed animals on shelves';
+  else if(combinado.indexOf('floresta')>-1||combinado.indexOf('mata')>-1||combinado.indexOf('arvore')>-1) cenario='enchanted forest with giant glowing trees, magical fireflies, golden light through leaves, mushrooms and flowers';
+  else if(combinado.indexOf('praia')>-1||combinado.indexOf('mar')>-1) cenario='sunny magical beach with crystal blue sea, colorful seashells, golden sand and gentle waves';
+  else if(combinado.indexOf('escola')>-1||combinado.indexOf('aula')>-1) cenario='cheerful bright classroom with rainbow desks, drawings on chalkboard, sunlight through windows';
+  else if(combinado.indexOf('parque')>-1||combinado.indexOf('jardim')>-1||combinado.indexOf('quintal')>-1) cenario='magical colorful garden with giant blooming flowers, butterflies, green hills and bright blue sky';
+  else if(combinado.indexOf('cozinha')>-1||combinado.indexOf('bolo')>-1) cenario='warm cozy kitchen with cakes on table, golden oven glow and colorful pots';
+  else if(combinado.indexOf('ceu')>-1||combinado.indexOf('nuvem')>-1||combinado.indexOf('voar')>-1) cenario='magical sky on giant fluffy clouds, rainbow, golden sunlight, colorful hot air balloons';
+  else if(combinado.indexOf('castelo')>-1) cenario='fairy tale castle hall with colorful banners, glowing windows, shiny stone floors';
+  else if(combinado.indexOf('espaco')>-1||combinado.indexOf('estrela')>-1||combinado.indexOf('planeta')>-1) cenario='magical outer space with colorful planets, sparkly stars and glowing moon';
+  else if(combinado.indexOf('assombra')>-1||combinado.indexOf('fantasma')>-1) cenario='spooky haunted house with glowing pumpkins, bats, purple moonlight and twisted trees';
+  else if(combinado.indexOf('montanha')>-1||combinado.indexOf('topo')>-1) cenario='dramatic mountain top with golden treasure chests, clouds below, epic sunset sky';
+
+  // Atmosfera por roteiro
   var atmosfera;
-  if(roteiro==='terror'){
-    atmosfera='ATMOSPHERE: dark and spooky horror mood, deep dramatic shadows, eerie cold purple and blue moonlight, '
-      +'creepy mist on the ground, dim flickering light, scary and suspenseful feeling. '
-      +'Color palette: dark purples, deep blacks, cold blues, ghostly whites. ';
-  } else if(roteiro==='aventura'){
-    atmosfera='ATMOSPHERE: epic adventurous mood, dramatic golden hour lighting, bold warm sunlight casting long shadows, '
-      +'heroic and exciting energy, dynamic composition. '
-      +'Color palette: warm golds, rich blues, vibrant greens, dramatic sunset oranges. ';
-  } else if(roteiro==='magia'){
-    atmosfera='ATMOSPHERE: magical and enchanted mood, soft glowing sparkles everywhere, ethereal light beams, '
-      +'dreamy pastel mist, stars and magical particles floating in the air, wonder and amazement. '
-      +'Color palette: soft purples, glowing pinks, golden sparkles, dreamy blues. ';
-  } else if(roteiro==='familia'){
-    atmosfera='ATMOSPHERE: warm and cozy family mood, soft golden indoor lighting, heartwarming and tender feeling, '
-      +'gentle warm glow like candlelight, safe and loving environment. '
-      +'Color palette: warm yellows, soft oranges, cream whites, gentle browns. ';
-  } else if(roteiro==='amizade'){
-    atmosfera='ATMOSPHERE: joyful and cheerful friendship mood, bright colorful lighting, playful and fun energy, '
-      +'rainbow colors and happiness everywhere, celebratory feeling. '
-      +'Color palette: bright pinks, cheerful yellows, sky blues, fresh greens. ';
-  } else if(roteiro==='animal'){
-    atmosfera='ATMOSPHERE: warm nature mood, soft natural sunlight filtering through trees, '
-      +'gentle and peaceful outdoor feeling, fresh and alive environment. '
-      +'Color palette: natural greens, warm earth tones, soft sky blues, golden sunlight. ';
-  } else if(roteiro==='sonho'){
-    atmosfera='ATMOSPHERE: dreamy and hopeful mood, soft ethereal lighting, floating clouds and stars, '
-      +'gentle pastel glow, everything slightly magical and surreal. '
-      +'Color palette: soft lavenders, dreamy pinks, pale golds, misty whites. ';
-  } else {
-    atmosfera='ATMOSPHERE: warm and magical storybook mood, soft colorful lighting, joyful and inviting feeling. ';
-  }
+  if(roteiro==='terror') atmosfera='dark spooky horror mood, deep shadows, eerie cold purple moonlight, creepy mist, dramatic horror lighting, dark purples and cold blues';
+  else if(roteiro==='aventura') atmosfera='epic adventurous mood, dramatic golden hour lighting, heroic energy, warm golds and rich blues';
+  else if(roteiro==='magia') atmosfera='magical enchanted mood, soft glowing sparkles, ethereal light, dreamy pastel mist, wonder and amazement';
+  else if(roteiro==='familia') atmosfera='warm cozy family mood, soft golden indoor lighting, heartwarming and tender feeling';
+  else if(roteiro==='amizade') atmosfera='joyful cheerful mood, bright colorful lighting, playful and fun energy, rainbow colors';
+  else if(roteiro==='animal') atmosfera='warm natural mood, soft sunlight through trees, gentle peaceful outdoor feeling';
+  else if(roteiro==='sonho') atmosfera='dreamy hopeful mood, soft ethereal lighting, floating clouds, gentle pastel glow';
+  else atmosfera='warm magical storybook mood, soft colorful lighting, joyful feeling';
 
-  // Interacao fisica explicita no INICIO do prompt (mais eficaz)
-  var interacaoFisica='';
-  if(parsNaPg.length>1){
-    if(combinado.indexOf('abraco')>-1||combinado.indexOf('juntos')>-1||combinado.indexOf('amor')>-1)
-      interacaoFisica='TWO CHIBI CHARACTERS HUGGING EACH OTHER tightly and warmly. ';
-    else if(combinado.indexOf('medo')>-1||combinado.indexOf('assust')>-1||combinado.indexOf('terror')>-1)
-      interacaoFisica='TWO CHIBI CHARACTERS HOLDING HANDS, both scared, trembling, looking around nervously together. ';
-    else if(combinado.indexOf('corr')>-1||combinado.indexOf('brinc')>-1||combinado.indexOf('pul')>-1)
-      interacaoFisica='TWO CHIBI CHARACTERS RUNNING AND PLAYING TOGETHER, laughing, full of energy. ';
-    else if(combinado.indexOf('corag')>-1||combinado.indexOf('heroi')>-1)
-      interacaoFisica='TWO CHIBI CHARACTERS STANDING SIDE BY SIDE BRAVELY, shoulder to shoulder, determined faces. ';
-    else if(combinado.indexOf('grit')>-1||combinado.indexOf('chama')>-1||combinado.indexOf('fala')>-1)
-      interacaoFisica='TWO CHIBI CHARACTERS TALKING TO EACH OTHER, one pointing or gesturing, both engaged. ';
-    else
-      interacaoFisica='TWO CHIBI CHARACTERS TOGETHER IN THE SCENE, interacting naturally with each other. ';
-  }
-
-  var prompt=(interacaoFisica?interacaoFisica:'')
-    +'Squishbook childrens book full illustrated scene. '
-    +atmosfera
-    +'BACKGROUND SETTING (fills entire image, very detailed and immersive): '+cenario+'. '
-    +'Rich layered environment: detailed foreground elements, mid-ground where characters stand, atmospheric background. '
-    +'CHARACTERS: '+descPersonagens
-    +(parsNaPg.length===1?'Character is INSIDE the scene, interacting with the environment naturally. ':'')
-    +'Character emotion: '+expressao+'. '
-    +'Art style: Squishbook signature - chibi plush characters with oversized sparkly eyes, chubby rosy cheeks, '
-    +'professional storybook illustration quality, characters take 40% of frame, rich scene fills 60%. '
-    +'NO text, NO watermark, NO speech bubbles, NO plain white background.';
+  // PASSO 1: Gera cenário puro com flux/schnell (SEM personagem)
+  var cenarioPrompt='Squishbook childrens book background illustration, NO characters, NO people, NO children. '
+    +'SETTING: '+cenario+'. '
+    +atmosfera+'. '
+    +'Wide angle view showing the full environment. '
+    +'Art style: soft pastel watercolor, warm magical lighting, professional storybook illustration. '
+    +'NO characters, NO people, NO children in the image.';
 
   try{
-    var model, body;
-    if(primeiroAvatarUrl){
-      // Usa flux-pulid com o avatar do protagonista como referencia de rosto
-      model='fal-ai/flux-pulid';
-      body={
-        prompt: prompt,
-        reference_image_url: primeiroAvatarUrl,
-        num_images: 1,
-        image_size: 'square_hd',
-        guidance_scale: 1.5,
-        num_inference_steps: 20
-      };
-    } else {
-      model='fal-ai/flux/schnell';
-      body={prompt:prompt,num_images:1,image_size:'square_hd',num_inference_steps:4};
-    }
-    var controller=new AbortController();
-    var timeout=setTimeout(function(){controller.abort();},55000);
+    var ctrl=new AbortController();
+    var tmout=setTimeout(function(){ctrl.abort();},45000);
     var res=await fetch('https://squishbook-backend.onrender.com/api/avatar',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:model,payload:body}),
-      signal:controller.signal
+      body:JSON.stringify({
+        model:'fal-ai/flux/schnell',
+        payload:{prompt:cenarioPrompt,num_images:1,image_size:'landscape_4_3',num_inference_steps:4}
+      }),
+      signal:ctrl.signal
     });
-    clearTimeout(timeout);
+    clearTimeout(tmout);
     var data=await res.json();
-    var url=data.images&&data.images[0]&&data.images[0].url;
-    return {pg:pg,idx:idx,url:url||null,erro:!url};
+    var cenarioUrl=data.images&&data.images[0]&&data.images[0].url;
+
+    if(!cenarioUrl) return {pg:pg,idx:idx,url:null,erro:true};
+
+    // PASSO 2: Composite no canvas — cenário + avatar(s) do personagem
+    // Pega o avatar do primeiro personagem na cena
+    var avatarPersonagens=parsNaPg.filter(function(p){return p.avatarUrl;});
+    if(avatarPersonagens.length===0){
+      // Sem avatar: retorna só o cenário
+      return {pg:pg,idx:idx,url:cenarioUrl,erro:false};
+    }
+
+    // Compõe no canvas
+    var compositeUrl=await compositeAvatarNaCena(cenarioUrl, avatarPersonagens, expressao, parsNaPg.length);
+    return {pg:pg,idx:idx,url:compositeUrl||cenarioUrl,erro:false};
+
   }catch(e){
+    console.error('Erro cena '+idx+':', e&&e.message?e.message:e);
     return {pg:pg,idx:idx,url:null,erro:true};
   }
+}
+
+// Compõe avatar(s) sobre o cenário usando Canvas
+function compositeAvatarNaCena(cenarioUrl, avatarPersonagens, expressao, totalParsNaPg){
+  return new Promise(function(resolve){
+    var canvas=document.createElement('canvas');
+    canvas.width=800; canvas.height=600;
+    var ctx=canvas.getContext('2d');
+
+    // Carrega o cenário primeiro
+    var cenarioImg=new Image();
+    cenarioImg.crossOrigin='anonymous';
+    cenarioImg.onload=function(){
+      // Desenha o cenário cobrindo o canvas inteiro
+      ctx.drawImage(cenarioImg,0,0,800,600);
+
+      // Overlay leve para integrar os personagens
+      ctx.fillStyle='rgba(0,0,0,0.08)';
+      ctx.fillRect(0,0,800,600);
+
+      // Posições dos avatares dependendo do número de personagens
+      var posicoes;
+      if(avatarPersonagens.length===1){
+        // 1 personagem: centro-baixo, tamanho maior
+        posicoes=[{x:280,y:200,w:240,h:340}];
+      } else if(avatarPersonagens.length===2){
+        // 2 personagens: lado a lado, centro-baixo
+        posicoes=[
+          {x:140,y:220,w:220,h:310},
+          {x:440,y:220,w:220,h:310}
+        ];
+      } else {
+        // 3+: distribuídos
+        posicoes=[
+          {x:80,y:230,w:200,h:280},
+          {x:300,y:220,w:200,h:290},
+          {x:520,y:230,w:200,h:280}
+        ];
+      }
+
+      var loaded=0;
+      var total=Math.min(avatarPersonagens.length, posicoes.length);
+
+      function desenharAvatar(i){
+        if(i>=total){
+          // Todos carregados - exporta
+          resolve(canvas.toDataURL('image/jpeg',0.92));
+          return;
+        }
+        var av=avatarPersonagens[i];
+        var pos=posicoes[i];
+        var avImg=new Image();
+        avImg.crossOrigin='anonymous';
+        avImg.onload=function(){
+          // Sombra suave abaixo do personagem
+          ctx.save();
+          ctx.shadowColor='rgba(0,0,0,0.35)';
+          ctx.shadowBlur=20;
+          ctx.shadowOffsetY=8;
+
+          // Desenha o avatar com tamanho proporcional mantendo aspect ratio
+          var ar=avImg.width/avImg.height;
+          var dw=pos.w;
+          var dh=dw/ar;
+          if(dh>pos.h){dh=pos.h;dw=dh*ar;}
+          var dx=pos.x+(pos.w-dw)/2;
+          var dy=pos.y+(pos.h-dh);
+
+          // Remove o fundo branco/claro do avatar (os avatares têm fundo neutro)
+          // Usa compositing para blend
+          ctx.globalCompositeOperation='source-over';
+          ctx.drawImage(avImg,dx,dy,dw,dh);
+          ctx.restore();
+
+          desenharAvatar(i+1);
+        };
+        avImg.onerror=function(){
+          desenharAvatar(i+1);
+        };
+        avImg.src=av.avatarUrl;
+      }
+
+      desenharAvatar(0);
+    };
+    cenarioImg.onerror=function(){
+      resolve(null);
+    };
+    cenarioImg.src=cenarioUrl;
+  });
 }
 
 function mostrarPosPagamento(c){
@@ -1698,7 +1719,7 @@ function gerarPDFFallback(){
       imgTag=imgTag.replace(imgStyle,imgStyle+';width:210px;height:210px;flex-shrink:0');
       pageContent='<div style="display:flex;flex-direction:row-reverse;gap:28px;align-items:flex-start">'+imgTag+'<div style="flex:1">'+numBadge+tituloDiv+textoDiv+'</div></div>';
     }
-    pgsHtml+='<div style="page-break-before:always;page-break-inside:avoid;background:'+bgCol+';padding:36px 40px 44px;position:relative;overflow:hidden">'
+    pgsHtml+='<div style="page-break-before:always;background:'+bgCol+';padding:38px 42px 48px;position:relative;overflow:hidden">'
       +decors[i%6]
       +'<div style="position:relative;z-index:1">'+pageContent+'</div>'
       +'<div style="position:absolute;bottom:0;left:0;right:0;height:36px;background:linear-gradient(90deg,'+pal.bg1+','+pal.bg2+');display:flex;align-items:center;justify-content:center">'
@@ -1707,10 +1728,10 @@ function gerarPDFFallback(){
   }
   var bookHtml='<!DOCTYPE html><html><head><meta charset="UTF-8"/>'
     +'<title>'+ST.historia.titulo+'</title>'
-    +'<link rel="preconnect" href="https://fonts.googleapis.com"/>'
-    +'<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>'
     +'<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&family=Baloo+2:wght@700;800;900&display=block" rel="stylesheet"/>'
-    +'<style>*{margin:0;padding:0;box-sizing:border-box}html,body{font-family:Nunito,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact;height:auto}@media print{@page{size:A5 portrait;margin:0}.no-print{display:none!important}}</style></head><body>'
+    +'<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Nunito,sans-serif}'
+    +'@media print{@page{size:A5 portrait;margin:0}.no-print{display:none!important}html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}'
+    +'</style></head><body>'
     +'<div style="page-break-after:always;min-height:100vh;background:linear-gradient(150deg,'+pal.bg1+' 0%,'+pal.bg2+' 55%,'+pal.bg3+' 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 36px;text-align:center;position:relative;overflow:hidden">'
     +'<div style="position:absolute;top:-100px;right:-100px;width:340px;height:340px;border-radius:50%;background:rgba(255,255,255,.07)"></div>'
     +'<div style="position:absolute;bottom:-80px;left:-80px;width:260px;height:260px;border-radius:50%;background:rgba(255,255,255,.04)"></div>'
@@ -1737,7 +1758,7 @@ function gerarPDFFallback(){
     +'<button onclick="window.close()" style="background:white;color:#180F2E;border:2px solid #EDE8F8;padding:14px 24px;border-radius:50px;font-size:15px;font-weight:800;cursor:pointer">Fechar</button>'
     +'</div></body></html>';
   var w=window.open('','_blank','width=680,height=960');
-  if(w){w.document.write(bookHtml);w.document.close();document.fonts.ready.then(function(){setTimeout(function(){w.print();},1500);});}
+  if(w){w.document.write(bookHtml);w.document.close();document.fonts.ready.then(function(){setTimeout(function(){w.print();},800);});}
 }
 
 function carregarImagem(url){
