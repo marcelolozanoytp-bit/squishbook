@@ -1383,6 +1383,7 @@ async function gerarCenaPagina(pg,idx){
   }
 
   var prompt=(interacaoFisica?interacaoFisica:'')
+    +(primeiroAvatarUrl?'CRITICAL: main character face MUST match the reference photo - same hair, skin tone, facial features. ':'')
     +'Squishbook childrens book full illustrated scene. '
     +atmosfera
     +'BACKGROUND SETTING (fills entire image, very detailed and immersive): '+cenario+'. '
@@ -1404,8 +1405,9 @@ async function gerarCenaPagina(pg,idx){
         reference_image_url: primeiroAvatarUrl,
         num_images: 1,
         image_size: 'square_hd',
-        guidance_scale: 6,
-        num_inference_steps: 20
+        guidance_scale: 8,
+        num_inference_steps: 25,
+        id_scale: 0.8
       };
     } else {
       model='fal-ai/flux/schnell';
@@ -1707,10 +1709,10 @@ function gerarPDFFallback(){
   }
   var bookHtml='<!DOCTYPE html><html><head><meta charset="UTF-8"/>'
     +'<title>'+ST.historia.titulo+'</title>'
+    +'<link rel="preconnect" href="https://fonts.googleapis.com"/>'
+    +'<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>'
     +'<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&family=Baloo+2:wght@700;800;900&display=block" rel="stylesheet"/>'
-    +'<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Nunito,sans-serif}'
-    +'@media print{@page{size:A5 portrait;margin:0}.no-print{display:none!important}html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}'
-    +'</style></head><body>'
+    +'<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Nunito,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}@media print{@page{size:A5 portrait;margin:0}.no-print{display:none!important}div{page-break-inside:avoid}}</style></head><body>'
     +'<div style="page-break-after:always;min-height:100vh;background:linear-gradient(150deg,'+pal.bg1+' 0%,'+pal.bg2+' 55%,'+pal.bg3+' 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 36px;text-align:center;position:relative;overflow:hidden">'
     +'<div style="position:absolute;top:-100px;right:-100px;width:340px;height:340px;border-radius:50%;background:rgba(255,255,255,.07)"></div>'
     +'<div style="position:absolute;bottom:-80px;left:-80px;width:260px;height:260px;border-radius:50%;background:rgba(255,255,255,.04)"></div>'
@@ -1737,7 +1739,7 @@ function gerarPDFFallback(){
     +'<button onclick="window.close()" style="background:white;color:#180F2E;border:2px solid #EDE8F8;padding:14px 24px;border-radius:50px;font-size:15px;font-weight:800;cursor:pointer">Fechar</button>'
     +'</div></body></html>';
   var w=window.open('','_blank','width=680,height=960');
-  if(w){w.document.write(bookHtml);w.document.close();document.fonts.ready.then(function(){setTimeout(function(){w.print();},800);});}
+  if(w){w.document.write(bookHtml);w.document.close();document.fonts.ready.then(function(){setTimeout(function(){w.print();},1500);});}
 }
 
 function carregarImagem(url){
