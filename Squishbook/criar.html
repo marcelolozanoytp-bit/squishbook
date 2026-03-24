@@ -1330,15 +1330,68 @@ async function gerarCenaPagina(pg,idx){
     else acaoInteracao='They are together in the scene, interacting naturally with each other. ';
   }
 
-  var prompt='Squishbook childrens book full illustrated scene. '
-    +'BACKGROUND (fills entire image, very detailed, colorful and immersive): '+cenario+'. '
-    +'Rich layered environment: detailed foreground, mid-ground where characters are placed, atmospheric background. '
-    +descPersonagens
-    +(parsNaPg.length>1?acaoInteracao:'The character is INSIDE the scene, interacting with the environment. ')
-    +'Emotion of scene: '+expressao+'. '
+  // Atmosfera global por roteiro — define lighting, mood e paleta da cena inteira
+  var roteiro=ST.roteiro||'aventura';
+  var atmosfera;
+  if(roteiro==='terror'){
+    atmosfera='ATMOSPHERE: dark and spooky horror mood, deep dramatic shadows, eerie cold purple and blue moonlight, '
+      +'creepy mist on the ground, dim flickering light, scary and suspenseful feeling. '
+      +'Color palette: dark purples, deep blacks, cold blues, ghostly whites. ';
+  } else if(roteiro==='aventura'){
+    atmosfera='ATMOSPHERE: epic adventurous mood, dramatic golden hour lighting, bold warm sunlight casting long shadows, '
+      +'heroic and exciting energy, dynamic composition. '
+      +'Color palette: warm golds, rich blues, vibrant greens, dramatic sunset oranges. ';
+  } else if(roteiro==='magia'){
+    atmosfera='ATMOSPHERE: magical and enchanted mood, soft glowing sparkles everywhere, ethereal light beams, '
+      +'dreamy pastel mist, stars and magical particles floating in the air, wonder and amazement. '
+      +'Color palette: soft purples, glowing pinks, golden sparkles, dreamy blues. ';
+  } else if(roteiro==='familia'){
+    atmosfera='ATMOSPHERE: warm and cozy family mood, soft golden indoor lighting, heartwarming and tender feeling, '
+      +'gentle warm glow like candlelight, safe and loving environment. '
+      +'Color palette: warm yellows, soft oranges, cream whites, gentle browns. ';
+  } else if(roteiro==='amizade'){
+    atmosfera='ATMOSPHERE: joyful and cheerful friendship mood, bright colorful lighting, playful and fun energy, '
+      +'rainbow colors and happiness everywhere, celebratory feeling. '
+      +'Color palette: bright pinks, cheerful yellows, sky blues, fresh greens. ';
+  } else if(roteiro==='animal'){
+    atmosfera='ATMOSPHERE: warm nature mood, soft natural sunlight filtering through trees, '
+      +'gentle and peaceful outdoor feeling, fresh and alive environment. '
+      +'Color palette: natural greens, warm earth tones, soft sky blues, golden sunlight. ';
+  } else if(roteiro==='sonho'){
+    atmosfera='ATMOSPHERE: dreamy and hopeful mood, soft ethereal lighting, floating clouds and stars, '
+      +'gentle pastel glow, everything slightly magical and surreal. '
+      +'Color palette: soft lavenders, dreamy pinks, pale golds, misty whites. ';
+  } else {
+    atmosfera='ATMOSPHERE: warm and magical storybook mood, soft colorful lighting, joyful and inviting feeling. ';
+  }
+
+  // Interacao fisica explicita no INICIO do prompt (mais eficaz)
+  var interacaoFisica='';
+  if(parsNaPg.length>1){
+    if(combinado.indexOf('abraco')>-1||combinado.indexOf('juntos')>-1||combinado.indexOf('amor')>-1)
+      interacaoFisica='TWO CHIBI CHARACTERS HUGGING EACH OTHER tightly and warmly. ';
+    else if(combinado.indexOf('medo')>-1||combinado.indexOf('assust')>-1||combinado.indexOf('terror')>-1)
+      interacaoFisica='TWO CHIBI CHARACTERS HOLDING HANDS, both scared, trembling, looking around nervously together. ';
+    else if(combinado.indexOf('corr')>-1||combinado.indexOf('brinc')>-1||combinado.indexOf('pul')>-1)
+      interacaoFisica='TWO CHIBI CHARACTERS RUNNING AND PLAYING TOGETHER, laughing, full of energy. ';
+    else if(combinado.indexOf('corag')>-1||combinado.indexOf('heroi')>-1)
+      interacaoFisica='TWO CHIBI CHARACTERS STANDING SIDE BY SIDE BRAVELY, shoulder to shoulder, determined faces. ';
+    else if(combinado.indexOf('grit')>-1||combinado.indexOf('chama')>-1||combinado.indexOf('fala')>-1)
+      interacaoFisica='TWO CHIBI CHARACTERS TALKING TO EACH OTHER, one pointing or gesturing, both engaged. ';
+    else
+      interacaoFisica='TWO CHIBI CHARACTERS TOGETHER IN THE SCENE, interacting naturally with each other. ';
+  }
+
+  var prompt=(interacaoFisica?interacaoFisica:'')
+    +'Squishbook childrens book full illustrated scene. '
+    +atmosfera
+    +'BACKGROUND SETTING (fills entire image, very detailed and immersive): '+cenario+'. '
+    +'Rich layered environment: detailed foreground elements, mid-ground where characters stand, atmospheric background. '
+    +'CHARACTERS: '+descPersonagens
+    +(parsNaPg.length===1?'Character is INSIDE the scene, interacting with the environment naturally. ':'')
+    +'Character emotion: '+expressao+'. '
     +'Art style: Squishbook signature - chibi plush characters with oversized sparkly eyes, chubby rosy cheeks, '
-    +'soft pastel watercolor painterly style, warm magical storybook lighting, professional illustration quality. '
-    +'Characters take up 40% of frame, rich colorful scene fills 60%. '
+    +'professional storybook illustration quality, characters take 40% of frame, rich scene fills 60%. '
     +'NO text, NO watermark, NO speech bubbles, NO plain white background.';
 
   try{
