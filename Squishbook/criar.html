@@ -891,11 +891,14 @@ function buildPrompt(est, proto, outros, tema, listaP, instrP){
     p += vocabInstrucao + '\n\n';
     p += 'DADOS DA HISTORIA:\n';
     p += 'Protagonista: ' + proto.nome + ', ' + idade + ' anos\n';
-    p += 'Presente de: ' + quem + '\n';
+    // FIX CRITICO (22/04 noite): "quem_da" NAO e personagem da historia.
+    // Se aparecer no prompt, o Claude inventa o personagem e inclui na narrativa.
+    // "quem_da" aparece APENAS na contracapa como remetente do presente.
     p += 'Detalhes pessoais: ' + detalhe + '\n';
     p += 'Tema: ' + tema + '\n';
     p += 'Tom: ' + tomRoteiro + '\n\n';
     p += instrP + '\n\n';
+    p += 'REGRA CRITICA: a historia usa EXCLUSIVAMENTE os personagens do ELENCO OBRIGATORIO listado acima. PROIBIDO inventar ou incluir qualquer outro personagem, mesmo que seja familiar do protagonista. Nao mencione pai, mae, irmao, avo, amigo ou qualquer outra pessoa que nao esteja no elenco.\n\n';
     p += 'COMO ESCREVER CADA PAGINA (OBRIGATORIO):\n';
     p += 'Cada pagina deve ter 3 blocos de texto separados por linha em branco, cada bloco com 2 a 3 frases.\n';
     p += 'Bloco 1: Cena VIVA com detalhe sensorial (cor, som, cheiro, textura, temperatura). Minimo 2 frases.\n';
@@ -965,11 +968,13 @@ function buildPrompt(est, proto, outros, tema, listaP, instrP){
     p += vocabInstrucao + '\n\n';
     p += 'DADOS DA HISTORIA:\n';
     p += 'Protagonista: ' + proto.nome + ', ' + idade + ' anos\n';
-    p += 'Presente de: ' + quem + '\n';
+    // FIX CRITICO (22/04 noite): "quem_da" aparece APENAS na contracapa como
+    // remetente, nunca como personagem da historia.
     p += 'Detalhes pessoais para incluir: ' + detalhe + '\n';
     p += 'Tema: ' + tema + '\n';
     p += 'Tom e genero: ' + tomRoteiro + '\n\n';
     p += instrP + '\n\n';
+    p += 'REGRA CRITICA: a historia usa EXCLUSIVAMENTE os personagens do ELENCO OBRIGATORIO listado acima. PROIBIDO inventar ou incluir qualquer outro personagem, mesmo que seja familiar do protagonista. Nao mencione pai, mae, irmao, avo, amigo ou qualquer outra pessoa que nao esteja no elenco.\n\n';
     p += 'COMO CONSTRUIR A HISTORIA:\n\n';
     p += 'INICIO (6 paragrafos ricos) - deve:\n';
     p += '1. Abrir com cena viva e especifica - nao "era uma vez", mas algo que acontece AGORA com detalhe sensorial\n';
@@ -990,7 +995,7 @@ function buildPrompt(est, proto, outros, tema, listaP, instrP){
     p += '2. Mostrar como cada personagem e afetado - cada um tem sua reacao propria\n';
     p += '3. Momento de celebracao ou emocao compartilhada entre todos\n';
     p += '4. Cena final que mostra (sem explicar) o que ' + proto.nome + ' aprendeu\n';
-    p += '5. Fechamento que menciona ' + quem + ' e deixa o leitor com calor no coracao\n\n';
+    p += '5. Fechamento que deixa o leitor com calor no coracao, usando apenas os personagens do elenco\n\n';
     p += 'REGRAS DE OURO:\n';
     p += '- Cada paragrafo tem pelo menos uma fala entre aspas\n';
     p += '- Pelo menos 4 momentos com detalhes sensoriais especificos\n';
@@ -1069,38 +1074,84 @@ async function gerarHistoria(){
   }catch(e){
     clearInterval(iv);
     var n=proto.nome;
-    var outro=ST.personagens.length>1?ST.personagens[1].nome:(ST.respostas.quem_da||'alguem especial');
+    // FIX CRITICO (22/04 noite): nao usar quem_da como fallback de segundo
+    // personagem (isso inventa Papai/Mamae na historia sem foto cadastrada).
+    // Se so houver 1 personagem cadastrado, a historia de fallback e solo —
+    // protagonista + elementos magicos do cenario (coruja sabia, vento,
+    // floresta, brilhos), NAO pessoas inventadas.
+    var temOutroReal = ST.personagens.length>1;
+    var outro = temOutroReal ? ST.personagens[1].nome : null;
     if(est==='visual'){
       // Mostra aviso de erro mas ainda continua com historia enriquecida
       var errMsg=document.getElementById('loadTxt');
       if(errMsg) errMsg.textContent='Gerando historia alternativa...';
       var rot2=ST.roteiro||'aventura';
-      ST.historia={titulo:n+' e a Grande '+({aventura:'Aventura',amizade:'Amizade',familia:'Familia',magia:'Magia',animal:'Descoberta',sonho:'Conquista',terror:'Susto'}[rot2]||'Descoberta'),emoji:({aventura:'\u{1F31F}',amizade:'\u{1F91D}',familia:'\u{2764}\uFE0F',magia:'\u2728',animal:'\u{1F43E}',sonho:'\u{1F308}',terror:'\u{1F383}'}[rot2]||'\u{1F31F}'),paginas:[
+      // FIX CRITICO (22/04 noite): se nao houver outro personagem cadastrado,
+      // a historia de fallback e solo — protagonista + elementos do cenario.
+      // Evita inventar "Papai"/"Mamae"/quem_da como personagem da historia.
+      var paginasFallback;
+      if(temOutroReal){
+        // Historia com 2 personagens reais (protagonista + outro cadastrado)
+        paginasFallback = [
         {num:1,titulo:'Uma manha diferente',texto:'O sol dourado entrou pela janela e acordou '+n+' com um calor gostoso no rosto. O cheiro de panquecas quentinhas vinha da cozinha, fazendo a barriga roncar de alegria.\n\nTIC-TAC! O relogio marcava a hora H. '+n+' saltou da cama de um pulo e correu pelo corredor com os pes descalcos no chao frio.\n\n"Hoje e um dia especial!", sussurrou '+n+' para si mesmo com os olhos brilhando. O coracao batia forte de tanta animacao e vontade de descobrir o que viria.'},
         {num:2,titulo:'A descoberta',texto:outro+' esperava sorrindo com algo escondido nas maos. O ambiente estava cheio de detalhes novos que '+n+' nunca tinha notado antes, cada canto guardava uma surpresa colorida.\n\nWHOOSH! Algo voou pelos ares deixando um rastro brilhante. '+n+' correu animado apontando para o ceu com os dois bracos abertos.\n\n"Voce esta vendo o que eu estou vendo?", gritou '+n+' pulando de felicidade. '+outro+' riu e acenou com a cabeca, os olhos cheios de cumplicidade e amor.'},
         {num:3,titulo:'O desafio',texto:'O caminho a frente estava cheio de pedras e galhos que balancavam com o vento. '+n+' sentia o coracao acelerar diante do obstaculo que parecia enorme e impossivel de superar.\n\nCRASH! Algo rolou pelo chao fazendo um barulhao que ecoou por todo lado. '+n+' parou no lugar com as maos na bochecha de tanto susto.\n\n"Como a gente vai passar por ali?", perguntou '+n+' com a voz tremula. '+outro+' segurou a mao de '+n+' com forca e sorriu: "Juntos a gente consegue qualquer coisa!".'},
-        {num:4,titulo:'O pior momento',texto:'A chuva comecou a cair forte e o vento assobiava entre as arvores fazendo um som assustador. '+n+' sentiu frio na barriga e vontade de voltar para casa quentinha.\n\nBOOM! Um trovao enorme sacudiu tudo ao redor. '+n+' se escondeu atras de '+outro+' tremendo de medo e molhado ate os ossos.\n\n"Eu quero desistir!", choramingou '+n+' segurando forte na mao de '+outro+'. '+outro+' abraçou '+n+' bem apertado: "Eu sei que voce e mais corajoso do que imagina".'},
-        {num:5,titulo:'A virada',texto:'Foi entao que '+n+' viu: um caminho secreto escondido entre as flores brilhando com luz propria. O coraçao deu um salto de esperança e os olhos brilharam como estrelas.\n\nSPLASH! '+n+' pisou numa poça e descobriu que o caminho levava exatamente onde precisavam chegar. '+outro+' ficou de boca aberta de tanta surpresa e orgulho.\n\n"Eu encontrei!", gritou '+n+' com os bracos erguidos para o alto. '+outro+' correu e abraçou '+n+' bem forte: "Sabia que voce conseguiria, meu heroi!".'},
+        {num:4,titulo:'O pior momento',texto:'A chuva comecou a cair forte e o vento assobiava entre as arvores fazendo um som assustador. '+n+' sentiu frio na barriga e vontade de voltar para casa quentinha.\n\nBOOM! Um trovao enorme sacudiu tudo ao redor. '+n+' se escondeu atras de '+outro+' tremendo de medo e molhado ate os ossos.\n\n"Eu quero desistir!", choramingou '+n+' segurando forte na mao de '+outro+'. '+outro+' abracou '+n+' bem apertado: "Eu sei que voce e mais corajoso do que imagina".'},
+        {num:5,titulo:'A virada',texto:'Foi entao que '+n+' viu: um caminho secreto escondido entre as flores brilhando com luz propria. O coracao deu um salto de esperanca e os olhos brilharam como estrelas.\n\nSPLASH! '+n+' pisou numa poca e descobriu que o caminho levava exatamente onde precisavam chegar. '+outro+' ficou de boca aberta de tanta surpresa e orgulho.\n\n"Eu encontrei!", gritou '+n+' com os bracos erguidos para o alto. '+outro+' correu e abracou '+n+' bem forte: "Sabia que voce conseguiria, meu heroi!".'},
         {num:6,titulo:'Para sempre no coracao',texto:'O sol voltou a brilhar e pintou o ceu de laranja e rosa como um quadro lindo. '+n+' e '+outro+' ficaram olhando juntos para aquela beleza que parecia feita especialmente para eles dois.\n\nMMMMM! Os dois suspiraram de alegria ao mesmo tempo e riram da coincidencia. O momento ficaria guardado no coracao de '+n+' para sempre, como um tesouro inestimavel.\n\n"Obrigado por estar comigo em tudo!", disse '+n+' com a voz cheia de amor. '+outro+' beijou a testa de '+n+' com carinho: "Para sempre juntos, para sempre amigos, para sempre familia".'}
-      ]};
+        ];
+      } else {
+        // Historia solo — sem inventar personagens. Elementos do cenario fazem o papel de cumplice.
+        paginasFallback = [
+        {num:1,titulo:'Uma manha diferente',texto:'O sol dourado entrou pela janela e acordou '+n+' com um calor gostoso no rosto. O cheiro de terra molhada vinha da janela aberta, misturado com o canto dos passaros.\n\nTIC-TAC! O relogio marcava a hora H. '+n+' saltou da cama de um pulo e correu pelo corredor com os pes descalcos no chao frio.\n\n"Hoje vai ser especial, eu sinto!", sussurrou '+n+' para si mesmo com os olhos brilhando. O coracao batia forte de tanta animacao e vontade de descobrir o que viria.'},
+        {num:2,titulo:'A descoberta',texto:'Uma luzinha dourada flutuava no ar perto da janela, piscando como se chamasse '+n+' para algo. O ambiente estava cheio de detalhes novos que '+n+' nunca tinha notado antes, cada canto guardava uma surpresa colorida.\n\nWHOOSH! A luzinha voou para fora deixando um rastro brilhante no ar. '+n+' correu animado apontando para o ceu com os dois bracos abertos.\n\n"Espera, me leva com voce!", gritou '+n+' pulando de felicidade. A luzinha pareceu rir e girou no ar, como se dissesse: vem, me segue.'},
+        {num:3,titulo:'O desafio',texto:'O caminho a frente estava cheio de pedras e galhos que balancavam com o vento. '+n+' sentia o coracao acelerar diante do obstaculo que parecia enorme e impossivel de superar.\n\nCRASH! Uma pedra rolou pelo chao fazendo um barulhao que ecoou por todo lado. '+n+' parou no lugar com as maos na bochecha de tanto susto.\n\n"Como eu vou passar por ali?", perguntou '+n+' com a voz tremula. O vento soprou suave nos cabelos de '+n+', como se sussurrasse: voce consegue.'},
+        {num:4,titulo:'O pior momento',texto:'A chuva comecou a cair forte e o vento assobiava entre as arvores fazendo um som assustador. '+n+' sentiu frio na barriga e vontade de voltar para casa quentinha.\n\nBOOM! Um trovao enorme sacudiu tudo ao redor. '+n+' se encolheu debaixo de uma arvore grande, tremendo de medo e molhado ate os ossos.\n\n"Eu quero desistir!", choramingou '+n+' apertando os bracos em volta do corpo. Mas entao, bem no meio do medo, '+n+' lembrou de como era forte por dentro.'},
+        {num:5,titulo:'A virada',texto:'Foi entao que '+n+' viu: um caminho secreto escondido entre as flores brilhando com luz propria. O coracao deu um salto de esperanca e os olhos brilharam como estrelas.\n\nSPLASH! '+n+' pisou numa poca e descobriu que o caminho levava exatamente onde precisava chegar. A luzinha dourada piscou tres vezes, como se aplaudisse.\n\n"Eu encontrei sozinho!", gritou '+n+' com os bracos erguidos para o alto. As arvores balancaram como se dancassem junto, celebrando a vitoria.'},
+        {num:6,titulo:'Para sempre no coracao',texto:'O sol voltou a brilhar e pintou o ceu de laranja e rosa como um quadro lindo. '+n+' ficou olhando aquela beleza que parecia feita especialmente para celebrar aquele dia.\n\nMMMMM! '+n+' suspirou de alegria e riu sozinho no meio do caminho. O momento ficaria guardado no coracao de '+n+' para sempre, como um tesouro inestimavel.\n\n"Eu sou mais corajoso do que pensava!", disse '+n+' com a voz cheia de orgulho. O vento soprou uma ultima vez, levando a alegria de '+n+' para todos os cantos do mundo.'}
+        ];
+      }
+      ST.historia={titulo:n+' e a Grande '+({aventura:'Aventura',amizade:'Amizade',familia:'Familia',magia:'Magia',animal:'Descoberta',sonho:'Conquista',terror:'Susto'}[rot2]||'Descoberta'),emoji:({aventura:'\u{1F31F}',amizade:'\u{1F91D}',familia:'\u{2764}\uFE0F',magia:'\u2728',animal:'\u{1F43E}',sonho:'\u{1F308}',terror:'\u{1F383}'}[rot2]||'\u{1F31F}'),paginas:paginasFallback};
     } else {
-      var ini = n+' tinha '+ST.idadeCrianca+' anos e naquele dia tudo era diferente.\n\n';
-      ini += 'O sol parecia mais brilhante, o ar mais fresco, e aquela sensacao estranha na barriga so aparecia quando algo incrivel estava prestes a acontecer.\n\n';
-      ini += outro+' chegou com um sorriso que dizia tudo sem precisar de palavras. "Hoje vai ser diferente", disse baixinho.\n\n';
-      ini += 'O bairro que '+n+' conhecia de cor ganhou contornos novos naquele momento. Cada detalhe parecia mais vivo, mais real, mais cheio de significado.\n\n';
-      ini += 'Entao aconteceu. Um acontecimento pequeno para os outros, imenso para '+n+'. Um chamado que nao podia ser ignorado.\n\n';
-      ini += 'Com o coracao acelerado e os olhos brilhando, '+n+' respirou fundo e deu o primeiro passo. Nao sabia o que viria. Mas sabia que precisava ir.';
-      var mei = 'O caminho foi longo e cheio de surpresas. Cada curva trazia algo novo para '+n+' descobrir.\n\n';
-      mei += outro+' estava ali em cada momento dificil, com aquela presenca que faz tudo parecer possivel.\n\n';
-      mei += 'Mas entao veio o obstaculo. Grande, assustador, diferente de tudo que '+n+' havia enfrentado antes. Por um segundo, a duvida bateu forte.\n\n';
-      mei += 'Foi uma lembranca que salvou tudo. Uma coisa que alguem especial tinha ensinado, guardada la no fundo do coracao para uma hora como aquela.\n\n';
-      mei += 'A tensao era maxima. O tempo parecia ter parado. '+n+' olhou para '+outro+' e encontrou nos olhos dele tudo que precisava saber.\n\n';
-      mei += 'E foi assim que '+n+' descobriu de onde vem a coragem de verdade: ela nao esta no ausencia do medo, mas na decisao de agir mesmo sentindo ele.';
-      var fim = 'O que aconteceu a seguir ficou gravado na memoria de '+n+' para sempre.\n\n';
-      fim += 'Cada personagem foi afetado de um jeito diferente. Mas todos saiam maiores do que tinham entrado.\n\n';
-      fim += 'Houve um momento, um instante suspenso no tempo, em que tudo fez sentido. Risos, lagrimas, abracos. A vida inteira cabendo em um unico segundo.\n\n';
-      fim += n+' entendeu entao que as historias mais bonitas nao sao aquelas que acontecem nos livros. Sao as que a gente vive, com as pessoas certas, nas horas certas.\n\n';
-      fim += 'E toda vez que '+n+' olhasse para aquele presente especial, lembraria: de '+outro+', daquele dia, e da descoberta mais importante de todas: que o amor e a maior aventura que existe.';
+      // FIX CRITICO (22/04 noite): fallback narrativo solo quando nao houver outro real.
+      var ini, mei, fim;
+      if(temOutroReal){
+        ini = n+' tinha '+ST.idadeCrianca+' anos e naquele dia tudo era diferente.\n\n';
+        ini += 'O sol parecia mais brilhante, o ar mais fresco, e aquela sensacao estranha na barriga so aparecia quando algo incrivel estava prestes a acontecer.\n\n';
+        ini += outro+' chegou com um sorriso que dizia tudo sem precisar de palavras. "Hoje vai ser diferente", disse baixinho.\n\n';
+        ini += 'O bairro que '+n+' conhecia de cor ganhou contornos novos naquele momento. Cada detalhe parecia mais vivo, mais real, mais cheio de significado.\n\n';
+        ini += 'Entao aconteceu. Um acontecimento pequeno para os outros, imenso para '+n+'. Um chamado que nao podia ser ignorado.\n\n';
+        ini += 'Com o coracao acelerado e os olhos brilhando, '+n+' respirou fundo e deu o primeiro passo. Nao sabia o que viria. Mas sabia que precisava ir.';
+        mei = 'O caminho foi longo e cheio de surpresas. Cada curva trazia algo novo para '+n+' descobrir.\n\n';
+        mei += outro+' estava ali em cada momento dificil, com aquela presenca que faz tudo parecer possivel.\n\n';
+        mei += 'Mas entao veio o obstaculo. Grande, assustador, diferente de tudo que '+n+' havia enfrentado antes. Por um segundo, a duvida bateu forte.\n\n';
+        mei += 'Foi uma lembranca que salvou tudo. Uma coisa que alguem especial tinha ensinado, guardada la no fundo do coracao para uma hora como aquela.\n\n';
+        mei += 'A tensao era maxima. O tempo parecia ter parado. '+n+' olhou para '+outro+' e encontrou nos olhos dele tudo que precisava saber.\n\n';
+        mei += 'E foi assim que '+n+' descobriu de onde vem a coragem de verdade: ela nao esta no ausencia do medo, mas na decisao de agir mesmo sentindo ele.';
+        fim = 'O que aconteceu a seguir ficou gravado na memoria de '+n+' para sempre.\n\n';
+        fim += 'Cada um foi afetado de um jeito diferente. Mas todos saiam maiores do que tinham entrado.\n\n';
+        fim += 'Houve um momento, um instante suspenso no tempo, em que tudo fez sentido. Risos, lagrimas, abracos. A vida inteira cabendo em um unico segundo.\n\n';
+        fim += n+' entendeu entao que as historias mais bonitas nao sao aquelas que acontecem nos livros. Sao as que a gente vive, com as pessoas certas, nas horas certas.\n\n';
+        fim += 'E toda vez que '+n+' olhasse para aquele dia especial, lembraria: de '+outro+', daquele momento, e da descoberta mais importante de todas: que o amor e a maior aventura que existe.';
+      } else {
+        ini = n+' tinha '+ST.idadeCrianca+' anos e naquele dia tudo era diferente.\n\n';
+        ini += 'O sol parecia mais brilhante, o ar mais fresco, e aquela sensacao estranha na barriga so aparecia quando algo incrivel estava prestes a acontecer.\n\n';
+        ini += 'Uma brisa suave passou pelo rosto de '+n+' trazendo um cheiro doce e desconhecido. "Hoje vai ser diferente", sussurrou '+n+' para si mesmo.\n\n';
+        ini += 'O bairro que '+n+' conhecia de cor ganhou contornos novos naquele momento. Cada detalhe parecia mais vivo, mais real, mais cheio de significado.\n\n';
+        ini += 'Entao aconteceu. Um acontecimento pequeno para os outros, imenso para '+n+'. Um chamado que nao podia ser ignorado.\n\n';
+        ini += 'Com o coracao acelerado e os olhos brilhando, '+n+' respirou fundo e deu o primeiro passo. Nao sabia o que viria. Mas sabia que precisava ir sozinho.';
+        mei = 'O caminho foi longo e cheio de surpresas. Cada curva trazia algo novo para '+n+' descobrir.\n\n';
+        mei += 'A natureza ao redor parecia conversar em silencio com '+n+', oferecendo pistas no vento, na luz, no barulho das folhas.\n\n';
+        mei += 'Mas entao veio o obstaculo. Grande, assustador, diferente de tudo que '+n+' havia enfrentado antes. Por um segundo, a duvida bateu forte.\n\n';
+        mei += 'Foi uma lembranca que salvou tudo. Uma coisa guardada la no fundo do coracao, esperando uma hora como aquela para aparecer.\n\n';
+        mei += 'A tensao era maxima. O tempo parecia ter parado. '+n+' fechou os olhos, respirou fundo, e encontrou dentro de si tudo que precisava.\n\n';
+        mei += 'E foi assim que '+n+' descobriu de onde vem a coragem de verdade: ela nao esta na ausencia do medo, mas na decisao de agir mesmo sentindo ele.';
+        fim = 'O que aconteceu a seguir ficou gravado na memoria de '+n+' para sempre.\n\n';
+        fim += 'Foi um momento em que a luz parecia vir de dentro, como se '+n+' tivesse acabado de acender uma vela que nunca mais ia apagar.\n\n';
+        fim += 'Houve um instante suspenso no tempo, em que tudo fez sentido. Paz, orgulho, uma alegria limpa que so quem supera algo grande conhece.\n\n';
+        fim += n+' entendeu entao que as historias mais bonitas nao sao as que acontecem nos livros. Sao as que a gente vive, nas horas em que tem coragem de olhar para dentro e seguir.\n\n';
+        fim += 'E toda vez que '+n+' olhasse para aquele dia, lembraria: da propria coragem, daquele caminho, e da descoberta mais importante de todas: que ja nascemos com tudo que precisamos, so falta descobrir.';
+      }
       ST.historia={titulo:'A Incrivel Aventura de '+n,emoji:'\u{1F31F}',inicio:ini,meio:mei,fim:fim};
     }
     ST.step=5; render();
