@@ -90,6 +90,9 @@ body{font-family:'Nunito',sans-serif;color:var(--texto);background:var(--cinza);
 .pers-info input{width:100%;border:1.5px solid var(--borda);border-radius:10px;padding:9px 12px;font-family:'Nunito',sans-serif;font-size:.93rem;color:var(--texto);outline:none;transition:border-color .2s}
 .pers-info input:focus{border-color:var(--azul)}
 .pers-role select{width:100%;border:1.5px solid var(--borda);border-radius:10px;padding:8px 12px;font-family:'Nunito',sans-serif;font-size:.9rem;color:var(--texto-sec);outline:none;background:#fff;cursor:pointer;margin-top:7px}
+.pers-meta{display:flex;gap:7px;margin-top:7px}
+.pers-meta select{flex:1;border:1.5px solid var(--borda);border-radius:10px;padding:8px 10px;font-family:'Nunito',sans-serif;font-size:.85rem;color:var(--texto-sec);outline:none;background:#fff;cursor:pointer}
+.pers-meta select:focus{border-color:var(--azul)}
 .pers-remove{background:none;border:none;color:#ccc;font-size:1rem;cursor:pointer;padding:4px;border-radius:6px;transition:color .2s;flex-shrink:0;align-self:flex-start}
 .pers-remove:hover{color:var(--erro)}
 .badge-free{position:absolute;top:10px;right:36px;background:var(--verde);color:white;font-size:.62rem;font-weight:800;padding:2px 8px;border-radius:20px}
@@ -368,12 +371,30 @@ var nextId = 2;
 
 // LoRA Squishbook treinado
 var LORA_URL = 'https://v3b.fal.media/files/b/0a93a99c/tK0lOZmDhul1GBBMhmCcM_pytorch_lora_weights.safetensors';
-var LORA_SCALE = 1.0;
+// FIX #3 (22/04): LORA_SCALE reduzido de 1.0 → 0.9 para aumentar consistência
+// entre cenas. Com 1.0 o LoRA domina e o pulid reinterpreta penteados/traços
+// da Mamãe a cada cena (seed diferente). Com 0.9 o pulid tem mais peso na
+// ref photo, mantendo o personagem reconhecível entre páginas. O estilo chibi
+// continua forte porque o TRIGGER e as descrições positivas garantem o look.
+var LORA_SCALE = 0.9;
 var TRIGGER = 'SQUISHBOOK_CHIBI';
+
+// UUID leve para identificar a sessão de geração (usado no log server-side)
+var SESSAO_ID = 'sq-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2,8);
+
+// Logger: envia cada tentativa de geração para o backend (não bloqueia se falhar)
+function logGeracao(dados){
+  try{
+    fetch('https://squishbook-backend-v2.onrender.com/api/geracao/log',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(Object.assign({sessao_id:SESSAO_ID}, dados||{}))
+    }).catch(function(){});
+  }catch(e){}
+}
 
 var ST = {
   step: 1,
-  personagens: [{id:1, nome:'', papel:'protagonista', fotoUrl:null, avatarUrl:null, avatarErro:false}],
+  personagens: [{id:1, nome:'', papel:'protagonista', genero:'', faixaEtaria:'', fotoUrl:null, avatarUrl:null, avatarErro:false, avatarErroMsg:''}],
   idadeCrianca: '',
   estiloAuto: null,
   estiloFinal: null,
@@ -403,6 +424,22 @@ var PAPEIS = [
   {v:'amigo',l:'Amigo especial'},
   {v:'pet',l:'Bichinho'},
   {v:'outro',l:'Outro'}
+];
+
+var GENEROS = [
+  {v:'',l:'Gênero...'},
+  {v:'masculino',l:'Masculino'},
+  {v:'feminino',l:'Feminino'},
+  {v:'nao_dizer',l:'Prefiro não dizer'}
+];
+
+var FAIXAS = [
+  {v:'',l:'Idade...'},
+  {v:'bebe',l:'Bebê'},
+  {v:'crianca',l:'Criança'},
+  {v:'adolescente',l:'Adolescente'},
+  {v:'adulto',l:'Adulto'},
+  {v:'idoso',l:'Idoso'}
 ];
 
 var PEMAP = {protagonista:'estrela',familiar:'coracao',amigo:'maos',pet:'pata',outro:'brilho'};
@@ -525,6 +562,16 @@ function renderPers(){
       var sel = p.papel===PAPEIS[j].v?' selected':'';
       opcoesSelect += '<option value="'+PAPEIS[j].v+'"'+sel+'>'+PAPEIS[j].l+'</option>';
     }
+    var opcoesGenero = '';
+    for(var jg=0;jg<GENEROS.length;jg++){
+      var selG = p.genero===GENEROS[jg].v?' selected':'';
+      opcoesGenero += '<option value="'+GENEROS[jg].v+'"'+selG+'>'+GENEROS[jg].l+'</option>';
+    }
+    var opcoesFaixa = '';
+    for(var jf=0;jf<FAIXAS.length;jf++){
+      var selF = p.faixaEtaria===FAIXAS[jf].v?' selected':'';
+      opcoesFaixa += '<option value="'+FAIXAS[jf].v+'"'+selF+'>'+FAIXAS[jf].l+'</option>';
+    }
     html += '<div class="pers-card'+(isPago?' premium':'')+'">'
       +badge
       +'<div class="pers-foto-wrap">'+fotoHtml
@@ -534,6 +581,10 @@ function renderPers(){
       +'<div class="pers-info"><label>'+labelNome+'</label>'
       +'<input type="text" placeholder="'+placeholderNome+'" value="'+p.nome+'" oninput="ST.personagens['+i+'].nome=this.value"/>'
       +'<div class="pers-role"><select onchange="ST.personagens['+i+'].papel=this.value">'+opcoesSelect+'</select></div>'
+      +'<div class="pers-meta">'
+      +'<select onchange="ST.personagens['+i+'].genero=this.value">'+opcoesGenero+'</select>'
+      +'<select onchange="ST.personagens['+i+'].faixaEtaria=this.value">'+opcoesFaixa+'</select>'
+      +'</div>'
       +'</div>'+removeBtn+'</div>';
   }
   l.innerHTML = html;
@@ -661,7 +712,7 @@ function tentarAdd(){
   } else { addP(); }
 }
 function confirmExtra(ov){ ov.remove(); ST.extras++; addP(); }
-function addP(){ ST.personagens.push({id:nextId++,nome:'',papel:'familiar',fotoUrl:null,avatarUrl:null,avatarErro:false}); renderPers(); }
+function addP(){ ST.personagens.push({id:nextId++,nome:'',papel:'familiar',genero:'',faixaEtaria:'',fotoUrl:null,avatarUrl:null,avatarErro:false,avatarErroMsg:''}); renderPers(); }
 function remP(id){
   var idx=ST.personagens.findIndex(function(p){return p.id===id;});
   if(idx>=4) ST.extras=Math.max(0,ST.extras-1);
@@ -815,11 +866,31 @@ function buildPrompt(est, proto, outros, tema, listaP, instrP){
   }
 
   if(est==='visual'){
+    // FIX Roteiro #2: elenco no topo do prompt, antes de qualquer outra regra,
+    // com checklist obrigatório por personagem pra impedir que o Claude esqueça
+    // coadjuvantes (bebês, secundários) em roteiros intensos como Terror.
+    var totalPers = ST.personagens.length;
+    var nomesTodos = ST.personagens.map(function(x){return x.nome;}).join(', ');
+    var checklistPers = ST.personagens.map(function(x,i){
+      var ppl2 = PAPEIS.filter(function(r){return r.v===x.papel;})[0];
+      var lbl = ppl2 ? ppl2.l : x.papel;
+      return '  [ ] '+x.nome+' ('+lbl+'): aparece em pelo menos 2 paginas com fala ou acao propria';
+    }).join('\n');
+
     p = 'Voce e o melhor autor brasileiro de livros infantis ilustrados. Cada pagina e uma cena que faz criancas pedirem "le de novo!"\n\n';
+    // ELENCO OBRIGATORIO no topo, formato de briefing
+    p += '========== ELENCO OBRIGATORIO ('+totalPers+' personagens) ==========\n';
+    p += nomesTodos + '\n\n';
+    p += listaP + '\n';
+    if(totalPers > 1){
+      p += 'CHECKLIST (antes de escrever, voce vai usar TODOS):\n' + checklistPers + '\n\n';
+      p += 'REGRA DE INCLUSAO INEGOCIAVEL: Esta historia tem '+totalPers+' personagens cadastrados e TODOS sao reais para a crianca que vai ler. Nao importa o tema. Mesmo em terror, mesmo em aventura solo, mesmo em sonho: TODOS aparecem, TODOS tem voz, TODOS sao parte da historia. Bebes e criancas pequenas aparecem carregados, observando, reagindo, dormindo na cena ao lado, mas APARECEM. Se voce terminar e perceber que esqueceu alguem, volte e reescreva.\n\n';
+      p += 'ANTI-PADRAO TERROR: terror infantil aqui NAO e historia de isolamento. A familia enfrenta o susto JUNTA. O protagonista pode liderar, mas os outros personagens estao na cena, ajudando, se escondendo juntos, sendo protegidos, se protegendo. Ninguem some "porque nao cabe no enredo de terror". Voce da jeito de caber.\n\n';
+    }
+    p += '=====================================================\n\n';
     p += vocabInstrucao + '\n\n';
     p += 'DADOS DA HISTORIA:\n';
     p += 'Protagonista: ' + proto.nome + ', ' + idade + ' anos\n';
-    p += 'Personagens (TODOS devem aparecer ativamente na historia):\n' + listaP;
     p += 'Presente de: ' + quem + '\n';
     p += 'Detalhes pessoais: ' + detalhe + '\n';
     p += 'Tema: ' + tema + '\n';
@@ -870,12 +941,30 @@ function buildPrompt(est, proto, outros, tema, listaP, instrP){
     }
     p += ']}';
   } else {
+    // FIX Roteiro #2: mesma estrutura do modo visual — elenco no topo e checklist.
+    var totalPersN = ST.personagens.length;
+    var nomesTodosN = ST.personagens.map(function(x){return x.nome;}).join(', ');
+    var checklistPersN = ST.personagens.map(function(x){
+      var ppl3 = PAPEIS.filter(function(r){return r.v===x.papel;})[0];
+      var lbl = ppl3 ? ppl3.l : x.papel;
+      return '  [ ] '+x.nome+' ('+lbl+'): ao menos uma fala e uma acao propria ao longo da historia';
+    }).join('\n');
+
     p = 'Voce e um dos maiores autores brasileiros de literatura infantil. Voce conhece o segredo das historias que ficam para sempre: personagens reais, emocoes verdadeiras, fio narrativo que prende do inicio ao fim.\n\n';
     p += 'Esta historia sera impressa e dada de presente. Ela precisa ser boa o suficiente para guardar pelo resto da vida.\n\n';
+    // ELENCO OBRIGATORIO no topo
+    p += '========== ELENCO OBRIGATORIO ('+totalPersN+' personagens) ==========\n';
+    p += nomesTodosN + '\n\n';
+    p += listaP + '\n';
+    if(totalPersN > 1){
+      p += 'CHECKLIST (antes de escrever, voce vai usar TODOS):\n' + checklistPersN + '\n\n';
+      p += 'REGRA DE INCLUSAO INEGOCIAVEL: Esta historia tem '+totalPersN+' personagens cadastrados e TODOS sao reais para a crianca que vai ler. Nao importa o tema. Mesmo em terror, mesmo em aventura solo, mesmo em sonho: TODOS aparecem, TODOS tem voz, TODOS sao parte da historia. Bebes e criancas pequenas aparecem carregados, observando, reagindo, dormindo na cena ao lado, mas APARECEM. Se voce terminar e perceber que esqueceu alguem, volte e reescreva.\n\n';
+      p += 'ANTI-PADRAO TERROR: terror infantil aqui NAO e historia de isolamento. A familia enfrenta o susto JUNTA. O protagonista pode liderar, mas os outros personagens estao na cena, ajudando, se escondendo juntos, sendo protegidos, se protegendo. Ninguem some "porque nao cabe no enredo de terror". Voce da jeito de caber.\n\n';
+    }
+    p += '=====================================================\n\n';
     p += vocabInstrucao + '\n\n';
     p += 'DADOS DA HISTORIA:\n';
     p += 'Protagonista: ' + proto.nome + ', ' + idade + ' anos\n';
-    p += 'Todos os personagens (TODOS devem ter cenas e falas relevantes):\n' + listaP;
     p += 'Presente de: ' + quem + '\n';
     p += 'Detalhes pessoais para incluir: ' + detalhe + '\n';
     p += 'Tema: ' + tema + '\n';
@@ -1092,6 +1181,7 @@ function s5(c){
     +'<button class="regen-btn"'+regenDis+' onclick="regenerar()">\u{1F504} Gerar novamente</button>'
     +'</div>'
     +'<div class="revisao-titulo">\u2728 Avatar de '+ST.personagens[0].nome+'</div>'
+    +'<div id="fotoAlertBox" style="display:none"></div>'
     +'<div class="avatares-grid" id="avatarGrid"></div>'
     +'<p style="font-size:.78rem;color:var(--texto-sec);margin-top:4px;text-align:center">Gerado especialmente a partir da foto</p>'
     +outrosHtml
@@ -1104,7 +1194,7 @@ function s5(c){
     +'</div>'
     +'<div class="btn-row">'
     +'<button class="btn btn-secondary" onclick="voltar()">\u2190 Voltar</button>'
-    +'<button class="btn btn-primary" onclick="av5()">Quero este livro! \u2192</button>'
+    +'<button class="btn btn-primary" id="btnContinuarS5" onclick="av5()">Quero este livro! \u2192</button>'
     +'</div>';
 
   renderAvatarGrid();
@@ -1118,6 +1208,8 @@ function renderAvatarGrid(){
   var conteudo;
   if(proto.avatarUrl){
     conteudo='<img src="'+proto.avatarUrl+'" style="width:110px;height:110px;border-radius:18px;object-fit:cover;box-shadow:0 6px 24px rgba(55,138,221,.25)"/>';
+  } else if(proto.avatarErro && proto.avatarErroMsg==='foto_sem_rosto'){
+    conteudo='<div style="width:110px;height:110px;border-radius:18px;background:#FEF2F2;border:2.5px solid #EF4444;display:flex;align-items:center;justify-content:center;font-size:2.5rem">📸</div>';
   } else if(proto.avatarErro){
     conteudo=proto.fotoUrl
       ?'<img src="'+proto.fotoUrl+'" style="width:110px;height:110px;border-radius:50%;object-fit:cover;border:2.5px solid var(--azul-cl)"/>'
@@ -1134,6 +1226,8 @@ function renderAvatarGrid(){
     +'</div>';
   // Gera apenas o avatar do protagonista pre-pagamento
   if(!proto.avatarUrl&&!proto.avatarErro) gerarAvatarDalle(proto);
+  // Chama o bloqueio após renderizar
+  atualizarBloqueioRevisao();
 }
 
 async function gerarAvatarDalle(p){
@@ -1196,34 +1290,59 @@ async function gerarAvatarDalle(p){
   var ehPet = p.papel === 'pet';
 
   var descFisica = '';
-  // Detecta se o personagem é adulto pelo papel ou pelo nome
-  var nomesAdultos = ['pai','papai','papa','mae','mamae','mama','tio','tia','vovo','vovô','vovó','avo','avô','avó','irmao','irmã','irma','primo','prima','amigo','amiga','padrinho','madrinha','professor','professora'];
-  var nomeAdulto = false;
-  if(p.nome){
-    var nomeLower = p.nome.toLowerCase();
-    for(var ni=0;ni<nomesAdultos.length;ni++){
-      if(nomeLower.indexOf(nomesAdultos[ni])>=0){ nomeAdulto=true; break; }
-    }
-  }
-  var papelAdulto = (p.papel==='familiar'||p.papel==='amigo'||p.papel==='outro');
-  var temFoto = !!imageUrl; // Se tem foto, o modelo vai usar a referência
 
-  if(p.papel === 'protagonista'){
-    if(ST.idadeCrianca && parseInt(ST.idadeCrianca) <= 8){
-      descFisica = 'young child approximately '+ST.idadeCrianca+' years old, small and cute, ';
-    } else if(ST.idadeCrianca){
-      descFisica = 'child approximately '+ST.idadeCrianca+' years old, ';
-    }
-  } else if(nomeAdulto || papelAdulto){
-    var generoAv='';
-    var nomesMascAv=['pai','papai','papa','tio','irmao','primo','vovo','avô','padrinho','professor'];
-    var nomesFemAv=['mae','mamae','tia','irma','prima','vovó','madrinha','professora'];
+  // --- FONTE DE VERDADE: campos explícitos do formulário ---
+  var faixaExp=p.faixaEtaria||'';
+  var generoExp=p.genero||'';
+  var ehAdultoExp=(faixaExp==='adulto'||faixaExp==='idoso');
+
+  var faixaDesc='';
+  if(faixaExp==='bebe') faixaDesc='BABY character, very young toddler, round baby face, chubby cheeks, ';
+  else if(faixaExp==='crianca') faixaDesc='CHILD character, young kid aged 4-8, child proportions, ';
+  else if(faixaExp==='adolescente') faixaDesc='TEENAGER character, pre-teen to teen, taller than a child, youthful face, ';
+  else if(faixaExp==='adulto') faixaDesc='ADULT character, mature adult face with adult proportions, clearly NOT a child, NOT a baby NOT an infant, adult chibi style, ';
+  else if(faixaExp==='idoso') faixaDesc='ELDERLY character, senior adult with mature face, gentle wrinkles, adult proportions, clearly NOT a child, ';
+
+  var generoDescAv='';
+  if(generoExp==='masculino') generoDescAv=ehAdultoExp?'male man, masculine face and features, ':'boy, masculine features, ';
+  else if(generoExp==='feminino') generoDescAv=ehAdultoExp?'female woman, feminine face and features, ':'girl, feminine features, ';
+
+  var temFoto = !!imageUrl;
+
+  if(faixaExp){
+    descFisica = faixaDesc + generoDescAv;
+  } else {
+    // Fallback heurístico (comportamento antigo)
+    var nomesAdultos = ['pai','papai','papa','mae','mamae','mama','tio','tia','vovo','vovô','vovó','avo','avô','avó','irmao','irmã','irma','primo','prima','amigo','amiga','padrinho','madrinha','professor','professora'];
+    var nomeAdulto = false;
     if(p.nome){
-      var nLav=p.nome.toLowerCase();
-      for(var gma=0;gma<nomesMascAv.length;gma++){if(nLav.indexOf(nomesMascAv[gma])>=0){generoAv='male man, masculine face and features, ';break;}}
-      if(!generoAv){for(var gfa=0;gfa<nomesFemAv.length;gfa++){if(nLav.indexOf(nomesFemAv[gfa])>=0){generoAv='female woman, feminine face and features, ';break;}}}
+      var nomeLower = p.nome.toLowerCase();
+      for(var ni=0;ni<nomesAdultos.length;ni++){
+        if(nomeLower.indexOf(nomesAdultos[ni])>=0){ nomeAdulto=true; break; }
+      }
     }
-    descFisica = 'ADULT character, '+generoAv+'mature face with adult proportions, NOT a baby NOT an infant, adult chibi style, ';
+    var papelAdulto = (p.papel==='familiar'||p.papel==='amigo'||p.papel==='outro');
+
+    if(p.papel === 'protagonista'){
+      if(ST.idadeCrianca && parseInt(ST.idadeCrianca) <= 8){
+        descFisica = 'young child approximately '+ST.idadeCrianca+' years old, small and cute, ';
+      } else if(ST.idadeCrianca){
+        descFisica = 'child approximately '+ST.idadeCrianca+' years old, ';
+      }
+      if(generoDescAv) descFisica += generoDescAv;
+    } else if(nomeAdulto || papelAdulto){
+      var generoAv=generoDescAv;
+      if(!generoAv){
+        var nomesMascAv=['pai','papai','papa','tio','irmao','primo','vovo','avô','padrinho','professor'];
+        var nomesFemAv=['mae','mamae','tia','irma','prima','vovó','madrinha','professora'];
+        if(p.nome){
+          var nLav=p.nome.toLowerCase();
+          for(var gma=0;gma<nomesMascAv.length;gma++){if(nLav.indexOf(nomesMascAv[gma])>=0){generoAv='male man, masculine face and features, ';break;}}
+          if(!generoAv){for(var gfa=0;gfa<nomesFemAv.length;gfa++){if(nLav.indexOf(nomesFemAv[gfa])>=0){generoAv='female woman, feminine face and features, ';break;}}}
+        }
+      }
+      descFisica = 'ADULT character, '+generoAv+'mature face with adult proportions, NOT a baby NOT an infant, adult chibi style, ';
+    }
   }
 
   var prompt;
@@ -1277,6 +1396,8 @@ async function gerarAvatarDalle(p){
     var url = data.images && data.images[0] && data.images[0].url;
     if(url){ 
       p.avatarUrl=url;
+      p.avatarErro=false;
+      p.avatarErroMsg='';
       // Salva prompt base e caracteristicas para reusar nas cenas
       // As cenas vao usar esse mesmo prompt + avatarUrl como referencia de estilo
       p.promptBase = ehPet
@@ -1287,9 +1408,21 @@ async function gerarAvatarDalle(p){
           +'big head small body chibi proportions, '+cor+' clothing and accent colors. ');
       p.ehPet=ehPet;
       p.cor=cor;
-    } else { p.avatarErro=true; }
+    } else {
+      p.avatarErro=true;
+      // Detecta erro específico de rosto não detectado (foto ruim)
+      var errMsg = (data && (data.detail||data.error||data.message)) || '';
+      if(typeof errMsg === 'object') errMsg = JSON.stringify(errMsg);
+      errMsg = String(errMsg).toLowerCase();
+      if(errMsg.indexOf('no face detected')>=0 || errMsg.indexOf('face detection')>=0 || errMsg.indexOf('facexlib')>=0 || errMsg.indexOf('align face fail')>=0){
+        p.avatarErroMsg = 'foto_sem_rosto';
+      } else {
+        p.avatarErroMsg = 'erro_geral';
+      }
+    }
   }catch(e){
     p.avatarErro=true;
+    p.avatarErroMsg='erro_geral';
   }
   var g=document.getElementById('avatarGrid'); if(!g) return;
   var papelLabel=PAPEIS.filter(function(r){return r.v===p.papel;})[0].l;
@@ -1299,6 +1432,9 @@ async function gerarAvatarDalle(p){
       var conteudo;
       if(p.avatarUrl){
         conteudo='<img src="'+p.avatarUrl+'" style="width:100px;height:100px;border-radius:16px;object-fit:cover;box-shadow:0 4px 16px rgba(0,0,0,.12)"/>';
+      } else if(p.avatarErro && p.avatarErroMsg==='foto_sem_rosto'){
+        conteudo='<div style="width:100px;height:100px;border-radius:16px;background:#FEF2F2;border:2px solid #EF4444;display:flex;align-items:center;justify-content:center;font-size:2.2rem">📸</div>'
+          +'<div style="font-size:.68rem;color:#B91C1C;font-weight:700;text-align:center;margin-top:4px;line-height:1.3;max-width:110px">Foto não funcionou<br/>Troque a foto</div>';
       } else {
         conteudo=p.fotoUrl
           ?'<img src="'+p.fotoUrl+'" style="width:100px;height:100px;border-radius:50%;object-fit:cover;border:2.5px solid var(--azul-cl)"/>'
@@ -1308,6 +1444,52 @@ async function gerarAvatarDalle(p){
       break;
     }
   }
+  // Atualiza UI de bloqueio do botão Continuar
+  atualizarBloqueioRevisao();
+}
+
+// Bloqueia botão "Continuar" na revisão se alguma foto falhou por rosto não detectado
+function atualizarBloqueioRevisao(){
+  var alertBox=document.getElementById('fotoAlertBox');
+  var btn=document.getElementById('btnContinuarS5');
+  if(!alertBox||!btn) return;
+  var comErro=ST.personagens.filter(function(p){
+    return p.avatarErro && p.avatarErroMsg==='foto_sem_rosto';
+  });
+  if(comErro.length>0){
+    var nomes=comErro.map(function(p){return '<strong>'+(p.nome||'Personagem')+'</strong>';}).join(', ');
+    alertBox.style.display='block';
+    alertBox.innerHTML='<div style="background:#FEF2F2;border:2px solid #EF4444;border-radius:14px;padding:14px 18px;margin-bottom:14px">'
+      +'<div style="font-size:.95rem;font-weight:800;color:#B91C1C;margin-bottom:6px">📸 A foto de '+nomes+' não funcionou</div>'
+      +'<div style="font-size:.82rem;color:#7F1D1D;line-height:1.55;margin-bottom:10px">Não conseguimos detectar o rosto. Troque por uma foto <strong>sem óculos escuros, sem chapéu cobrindo a testa, rosto de frente e bem iluminado</strong>.</div>'
+      +'<button onclick="voltarParaCorrigirFoto()" style="background:#EF4444;color:white;border:none;padding:10px 18px;border-radius:25px;font-weight:800;cursor:pointer;font-size:.85rem;font-family:Nunito,sans-serif">Voltar e trocar a foto</button>'
+      +'</div>';
+    btn.disabled=true;
+    btn.style.opacity='0.4';
+    btn.style.cursor='not-allowed';
+    btn.title='Troque a foto com problema antes de continuar';
+  } else {
+    alertBox.style.display='none';
+    alertBox.innerHTML='';
+    btn.disabled=false;
+    btn.style.opacity='';
+    btn.style.cursor='';
+    btn.title='';
+  }
+}
+
+// Volta para a etapa 1 preservando tudo menos os avatares com erro
+function voltarParaCorrigirFoto(){
+  ST.personagens.forEach(function(p){
+    if(p.avatarErro && p.avatarErroMsg==='foto_sem_rosto'){
+      p.fotoUrl=null;
+      p.avatarUrl=null;
+      p.avatarErro=false;
+      p.avatarErroMsg='';
+    }
+  });
+  ST.step=1;
+  render();
 }
 
 function togCap(i){
@@ -1561,7 +1743,11 @@ function sfim(c){
     mostrarAprovacaoHistoria(c);
   } else {
     mostrarGerando(c);
-    gerarCenas().then(function(){ mostrarPosPagamento(c); });
+    gerarCenas().then(function(){ mostrarPosPagamento(c); }).catch(function(e){
+      // FIX BUG 1: se geração foi bloqueada (cenas falhadas), a tela de erro já foi mostrada.
+      // Aqui só não sobrescrevemos com mostrarPosPagamento.
+      console.warn('[gerarCenas] bloqueado:', e && e.message);
+    });
   }
 }
 
@@ -1662,7 +1848,9 @@ function aprovarHistoriaImpresso(){
   var c=document.getElementById('cardContent');
   // Gera 12 cenas para impresso
   mostrarGerando(c);
-  gerarCenas().then(function(){ mostrarPosPagamento(c); });
+  gerarCenas().then(function(){ mostrarPosPagamento(c); }).catch(function(e){
+    console.warn('[gerarCenas impresso] bloqueado:', e && e.message);
+  });
 }
 
 function mostrarErro(c){
@@ -1787,6 +1975,26 @@ async function gerarCenas(){
     POS.cenasGeradas.push(resultado);
   }
 
+  // FIX BUG 1 (CRÍTICO): bloqueio de entrega se QUALQUER cena falhou.
+  // Antes o sistema mostrava "Presente enviado!" mesmo com cenas com erro.
+  var cenasFalhadas = POS.cenasGeradas.filter(function(r){return r.erro===true || !r.url;});
+  var cenasFallback = POS.cenasGeradas.filter(function(r){return r.fallback===true;});
+
+  if(cenasFalhadas.length > 0){
+    logGeracao({tipo:'sessao',status:'bloqueado_cenas_falhadas',erro_msg:'Falharam '+cenasFalhadas.length+' de '+POS.cenasGeradas.length+' cenas'});
+    mostrarErroGeracao(cenasFalhadas, 'cenas_falhadas');
+    throw new Error('GERACAO_BLOQUEADA_CENAS_FALHADAS');
+  }
+
+  // Se há cenas que caíram no fallback genérico (sem personagens corretos), avisa mas permite seguir
+  if(cenasFallback.length > 0){
+    logGeracao({tipo:'sessao',status:'aviso_fallback',erro_msg:cenasFallback.length+' cenas em fallback'});
+    var prosseguir = await mostrarAvisoQualidade(cenasFallback);
+    if(!prosseguir){
+      throw new Error('GERACAO_CANCELADA_USUARIO');
+    }
+  }
+
   await ativarEtapa('e3');
   await new Promise(function(r){setTimeout(r,400);});
   await ativarEtapa('e4');
@@ -1806,6 +2014,56 @@ async function gerarCenas(){
   await new Promise(function(r){setTimeout(r,400);});
 }
 
+// FIX BUG 1: Tela de erro quando há cenas que falharam. Oferece tentar novamente ou contato suporte.
+function mostrarErroGeracao(cenasFalhadas, motivo){
+  var c=document.getElementById('cardContent');
+  if(!c) return;
+  var listaCenas = cenasFalhadas.map(function(r){
+    return '<li>Página '+((r.idx||0)+1)+(r.pg&&r.pg.titulo?' - '+r.pg.titulo:'')+'</li>';
+  }).join('');
+
+  var numWhats = '5511970944446';
+  var msgWhats = encodeURIComponent('Oi! Tive um problema gerando meu livro no Squishbook. Sessão: '+SESSAO_ID+'. '+cenasFalhadas.length+' cenas falharam.');
+
+  c.innerHTML = '<div class="erro-wrap" style="text-align:center;padding:24px">'
+    +'<div style="font-size:56px">⚠️</div>'
+    +'<h2 style="color:#dc2626;margin:16px 0">Tivemos um problema na geração</h2>'
+    +'<p style="color:var(--texto-sec);margin:12px 0">Algumas ilustrações não foram geradas com sucesso. Não vamos entregar um livro incompleto.</p>'
+    +'<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px;margin:16px 0;text-align:left">'
+    +'<strong>Cenas com problema:</strong><ul style="margin:8px 0 0 20px">'+listaCenas+'</ul>'
+    +'</div>'
+    +'<p style="color:var(--texto-sec);font-size:14px">Código da sessão: <code>'+SESSAO_ID+'</code></p>'
+    +'<div style="display:flex;gap:12px;justify-content:center;margin-top:24px;flex-wrap:wrap">'
+    +'<button class="btn btn-primary" onclick="location.reload()">🔄 Tentar de novo</button>'
+    +'<a href="https://wa.me/'+numWhats+'?text='+msgWhats+'" target="_blank" class="btn" style="background:#10b981;color:white">💬 Falar com suporte</a>'
+    +'</div>'
+    +'</div>';
+  // Scrolla pro topo
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// Aviso quando algumas cenas caíram em fallback (qualidade reduzida). Retorna Promise<boolean>.
+function mostrarAvisoQualidade(cenasFallback){
+  return new Promise(function(resolve){
+    var c=document.getElementById('cardContent');
+    if(!c){ resolve(true); return; }
+    var lista = cenasFallback.map(function(r){
+      return '<li>Página '+((r.idx||0)+1)+(r.pg&&r.pg.titulo?' - '+r.pg.titulo:'')+'</li>';
+    }).join('');
+    c.innerHTML = '<div style="text-align:center;padding:24px">'
+      +'<div style="font-size:48px">ℹ️</div>'
+      +'<h2 style="color:#d97706;margin:16px 0">Algumas cenas ficaram mais simples</h2>'
+      +'<p style="color:var(--texto-sec);margin:12px 0">Em '+cenasFallback.length+' cena(s), a ilustração ficou mais genérica (sem referência da foto). Você pode prosseguir assim ou refazer do zero.</p>'
+      +'<div style="background:#fefce8;border:1px solid #fde68a;border-radius:8px;padding:16px;margin:16px 0;text-align:left"><ul style="margin:0 0 0 20px">'+lista+'</ul></div>'
+      +'<div style="display:flex;gap:12px;justify-content:center;margin-top:24px;flex-wrap:wrap">'
+      +'<button class="btn btn-primary" id="btnProsseguir">Prosseguir assim mesmo</button>'
+      +'<button class="btn" onclick="location.reload()" style="background:#f3f4f6">🔄 Refazer do zero</button>'
+      +'</div></div>';
+    document.getElementById('btnProsseguir').onclick=function(){resolve(true);};
+    window.scrollTo({top:0,behavior:'smooth'});
+  });
+}
+
 // Monta descrição dos personagens da cena para o prompt
 function descreverPersonagemParaPrompt(p, expressao, isPrincipal){
   var ehPet=p.papel==='pet';
@@ -1822,60 +2080,83 @@ function descreverPersonagemParaPrompt(p, expressao, isPrincipal){
   }
   var base='a Squishbook chibi human character';
   if(isPrincipal) base='the MAIN Squishbook chibi character (protagonist)';
-  // Detecta adulto pelo papel
+
+  // --- FONTE DE VERDADE: campos explícitos do formulário ---
+  var faixa=p.faixaEtaria||'';
   var adultoDesc='';
-  // Todo familiar ou "outro" é tratado como adulto por padrão (avós, mães, pais, tios)
-  var papelAdultoCena=(p.papel==='familiar'||p.papel==='outro');
-  var nomeAdultoCena=false;
-  var nomesAdultosCena=['pai','papai','papa','mae','mamae','mamãe','mãe','mama','tio','tia','vovo','vovô','vovó','avo','avô','avó','irmao','irma','primo','prima','padrinho','madrinha'];
-  if(p.nome){var nL=p.nome.toLowerCase();for(var i=0;i<nomesAdultosCena.length;i++){if(nL.indexOf(nomesAdultosCena[i])>=0){nomeAdultoCena=true;break;}}}
-  // Detecta gênero pelo nome — papel > lista de papéis > terminação do nome
-  var generoDesc='';
-  var nomesMascCena=['pai','papai','papa','tio','irmao','primo','vovo','vovô','avo','avô','padrinho'];
-  var nomesFemCena=['mae','mamae','mamãe','mãe','mama','tia','irma','prima','vovó','avó','madrinha'];
-  if(p.nome){
-    var nLg=p.nome.toLowerCase();
-    // 1. Busca por palavras de papel masculino/feminino no nome
-    for(var gm=0;gm<nomesMascCena.length;gm++){if(nLg.indexOf(nomesMascCena[gm])>=0){generoDesc='male man, masculine features, ';break;}}
-    if(!generoDesc){for(var gf=0;gf<nomesFemCena.length;gf++){if(nLg.indexOf(nomesFemCena[gf])>=0){generoDesc='female woman, feminine features, ';break;}}}
-    // 2. Se não achou por papel, detecta pelo primeiro nome (terminação comum no português)
-    if(!generoDesc){
-      var primeiroNome=nLg.split(' ')[0];
-      // Nomes masculinos comuns terminados em o, os, el, er, on, im, in, o, u
-      var terminacaoMasc=['marcelo','carlos','paulo','joao','joão','pedro','lucas','rafael','felipe','gabriel',
-        'antonio','antônio','roberto','luis','luís','francisco','jose','josé','mario','mário',
-        'andre','andrè','thiago','rodrigo','fernando','gustavo','ricardo','eduardo','leandro',
-        'caio','diego','vitor','victor','mateus','matheus','henrique','renato','fabio','fábio',
-        'celso','sergio','sérgio','jorge','marcos','alex','daniel','danilo','bruno','julio','júlio'];
-      var terminacaoFem=['fran','franciely','maria','ana','julia','júlia','patricia','patrícia',
-        'mariana','fernanda','amanda','camila','gabriela','leticia','letícia','beatriz',
-        'isabela','isabella','carolina','carina','claudia','cláudia','vanessa','jessica',
-        'jéssica','priscila','renata','sabrina','tatiana','tatiane','veronica','verónica',
-        'katia','kátia','lucia','lúcia','monica','mônica','sonia','sônia','vera','helena',
-        'alice','laura','emma','sofia','valentina','larissa','bruna','aline','paula','elisa',
-        'ellem','lorena','gabi','karina'];
-      for(var nm=0;nm<terminacaoMasc.length;nm++){if(primeiroNome===terminacaoMasc[nm]||primeiroNome.startsWith(terminacaoMasc[nm])){generoDesc='male man, masculine features, ';break;}}
-      if(!generoDesc){
-        for(var nf=0;nf<terminacaoFem.length;nf++){if(primeiroNome===terminacaoFem[nf]||primeiroNome.startsWith(terminacaoFem[nf])){generoDesc='female woman, feminine features, ';break;}}
-      }
-      // 3. Fallback por terminação da letra final
-      if(!generoDesc){
-        if(primeiroNome.endsWith('o')||primeiroNome.endsWith('os')) generoDesc='male man, masculine features, ';
-        else if(primeiroNome.endsWith('a')||primeiroNome.endsWith('as')) generoDesc='female woman, feminine features, ';
-      }
+  var ehAdulto=(faixa==='adulto'||faixa==='idoso');
+  if(faixa==='bebe'){
+    adultoDesc='BABY character, very young toddler, round baby face, small body, chubby cheeks, tiny hands, ';
+  } else if(faixa==='crianca'){
+    adultoDesc='CHILD character, young kid aged 4-8, child proportions, ';
+  } else if(faixa==='adolescente'){
+    adultoDesc='TEENAGER character, pre-teen to teen, taller than a child, youthful face, ';
+  } else if(faixa==='adulto'){
+    adultoDesc='ADULT character, mature adult face with adult proportions, clearly NOT a child, clearly taller than children, NOT a baby NOT an infant, ';
+  } else if(faixa==='idoso'){
+    adultoDesc='ELDERLY character, senior adult with mature gentle face, gentle wrinkles, adult proportions, clearly NOT a child, ';
+  } else {
+    // Fallback heurístico antigo quando faixa não informada
+    var papelAdultoCena=(p.papel==='familiar'||p.papel==='outro');
+    var nomeAdultoCena=false;
+    var nomesAdultosCena=['pai','papai','papa','mae','mamae','mamãe','mãe','mama','tio','tia','vovo','vovô','vovó','avo','avô','avó','irmao','irma','primo','prima','padrinho','madrinha'];
+    if(p.nome){var nL=p.nome.toLowerCase();for(var i=0;i<nomesAdultosCena.length;i++){if(nL.indexOf(nomesAdultosCena[i])>=0){nomeAdultoCena=true;break;}}}
+    if(nomeAdultoCena||papelAdultoCena){
+      adultoDesc='ADULT character, mature adult face, clearly NOT a child, taller than children, ';
+      ehAdulto=true;
     }
   }
-  // Para familiar sem gênero detectado, default masculino (mais comum como "Papai")
-  if(!generoDesc && papelAdultoCena) generoDesc='adult person, ';
-  if(nomeAdultoCena||papelAdultoCena) adultoDesc='ADULT character, '+generoDesc+'mature adult face, clearly NOT a child, taller than children, ';
-  return base+', '+adultoDesc+'HUMAN ONLY no fur no animal features, '
+
+  // Gênero explícito tem prioridade
+  var generoDesc='';
+  if(p.genero==='masculino'){
+    generoDesc=ehAdulto?'male man, masculine face and features, ':'boy, masculine features, ';
+  } else if(p.genero==='feminino'){
+    generoDesc=ehAdulto?'female woman, feminine face and features, ':'girl, feminine features, ';
+  } else {
+    // Sem gênero explícito (vazio ou nao_dizer): heurística antiga
+    var nomesMascCena=['pai','papai','papa','tio','irmao','primo','vovo','vovô','avo','avô','padrinho'];
+    var nomesFemCena=['mae','mamae','mamãe','mãe','mama','tia','irma','prima','vovó','avó','madrinha'];
+    if(p.nome){
+      var nLg=p.nome.toLowerCase();
+      for(var gm=0;gm<nomesMascCena.length;gm++){if(nLg.indexOf(nomesMascCena[gm])>=0){generoDesc=ehAdulto?'male man, masculine features, ':'boy, masculine features, ';break;}}
+      if(!generoDesc){for(var gf=0;gf<nomesFemCena.length;gf++){if(nLg.indexOf(nomesFemCena[gf])>=0){generoDesc=ehAdulto?'female woman, feminine features, ':'girl, feminine features, ';break;}}}
+      if(!generoDesc){
+        var primeiroNome=nLg.split(' ')[0];
+        var terminacaoMasc=['marcelo','carlos','paulo','joao','joão','pedro','lucas','rafael','felipe','gabriel',
+          'antonio','antônio','roberto','luis','luís','francisco','jose','josé','mario','mário',
+          'andre','andrè','thiago','rodrigo','fernando','gustavo','ricardo','eduardo','leandro',
+          'caio','diego','vitor','victor','mateus','matheus','henrique','renato','fabio','fábio',
+          'celso','sergio','sérgio','jorge','marcos','alex','daniel','danilo','bruno','julio','júlio'];
+        var terminacaoFem=['fran','franciely','maria','ana','julia','júlia','patricia','patrícia',
+          'mariana','fernanda','amanda','camila','gabriela','leticia','letícia','beatriz',
+          'isabela','isabella','carolina','carina','claudia','cláudia','vanessa','jessica',
+          'jéssica','priscila','renata','sabrina','tatiana','tatiane','veronica','verónica',
+          'katia','kátia','lucia','lúcia','monica','mônica','sonia','sônia','vera','helena',
+          'alice','laura','emma','sofia','valentina','larissa','bruna','aline','paula','elisa',
+          'ellem','lorena','gabi','karina'];
+        for(var nm=0;nm<terminacaoMasc.length;nm++){if(primeiroNome===terminacaoMasc[nm]||primeiroNome.startsWith(terminacaoMasc[nm])){generoDesc=ehAdulto?'male man, masculine features, ':'boy, masculine features, ';break;}}
+        if(!generoDesc){
+          for(var nf=0;nf<terminacaoFem.length;nf++){if(primeiroNome===terminacaoFem[nf]||primeiroNome.startsWith(terminacaoFem[nf])){generoDesc=ehAdulto?'female woman, feminine features, ':'girl, feminine features, ';break;}}
+        }
+        if(!generoDesc){
+          if(primeiroNome.endsWith('o')||primeiroNome.endsWith('os')) generoDesc=ehAdulto?'male man, masculine features, ':'boy, masculine features, ';
+          else if(primeiroNome.endsWith('a')||primeiroNome.endsWith('as')) generoDesc=ehAdulto?'female woman, feminine features, ':'girl, feminine features, ';
+        }
+      }
+    }
+    if(!generoDesc && ehAdulto) generoDesc='adult person, ';
+  }
+
+  return base+', '+adultoDesc+generoDesc+'HUMAN ONLY no fur no animal features, '
     +'ultra soft squishy human plush doll, oversized glossy eyes with sparkle highlights, '
     +'chubby round human face, rosy cheeks, big head small body chibi proportions, '
     +cor+' clothing, '+expressao;
 }
 
-// Gera descrição do cenário via Claude com base no texto real da página
-async function gerarDescricaoCenario(texto, titulo, roteiro){
+// Extrai TUDO da cena em uma única chamada: cenário + objetos narrativos + ação específica + personagens presentes
+// Retorna: { cenario:'...', objetos:[{nome,tipo,descricao}], acao:'...', personagensPresentes:['Nome1','Nome2'] }
+async function extrairElementosDaCena(texto, titulo, roteiro, personagensCadastrados){
   var fallbacks={
     aventura:'lush enchanted forest trail with ancient trees, magical glowing mushrooms and golden sunrays',
     amizade:'sunny colorful playground with swings, slides and bright flowers in warm afternoon light',
@@ -1885,37 +2166,80 @@ async function gerarDescricaoCenario(texto, titulo, roteiro){
     sonho:'dreamy cloudscape with fluffy pink clouds, floating islands and soft pastel sky at golden hour',
     terror:'spooky moonlit forest clearing with twisted trees, glowing fog and eerie purple shadows'
   };
-  var fallback=fallbacks[roteiro]||fallbacks.familia;
+  var fallbackCenario=fallbacks[roteiro]||fallbacks.familia;
+  var fallbackObj={cenario:fallbackCenario, objetos:[], acao:'', personagensPresentes:(personagensCadastrados||[]).map(function(p){return p.nome;})};
+
+  var listaCad=(personagensCadastrados||[]).map(function(p){return p.nome+' ('+p.papel+')';}).join(', ');
   try{
-    var prompt='Read this childrens book page and return ONLY a background setting description in English for an image generator.\n\n'
-      +'Page title: '+titulo+'\nPage text: '+texto+'\nStory theme: '+roteiro+'\n\n'
-      +'Return ONLY a single sentence (max 20 words) describing the BACKGROUND SETTING. '
-      +'NO characters. ONLY English. ONLY one sentence. Example: "cozy bakery kitchen with flour-dusted wooden counters and warm oven glow"';
+    var prompt='You are analyzing a page of a childrens book to help an image generator create an accurate illustration. Return a JSON object with 4 fields.\n\n'
+      +'Page title: '+titulo+'\n'
+      +'Page text: '+texto+'\n'
+      +'Story theme: '+roteiro+'\n'
+      +'Registered characters (these are the REAL people in the book, each with their own photo reference): '+listaCad+'\n\n'
+      +'Return ONLY valid JSON (no markdown fences, no preamble). Schema:\n'
+      +'{\n'
+      +'  "cenario": "one short English sentence (max 20 words) describing ONLY the background setting. NO characters, NO people. Example: cozy wooden bedroom with blue bedsheets and warm moonlight through window",\n'
+      +'  "objetos": [ { "nome": "original Portuguese name from the text", "tipo": "stuffed_toy | toy | monster_imaginary | shadow | creature | magical_object | other", "descricao": "short English visual description, max 12 words. IMPORTANT: if tipo is stuffed_toy or toy, describe it as an INANIMATE OBJECT not a person. Example: brown plush teddy bear with red bow, inanimate stuffed toy, not a person" } ],\n'
+      +'  "acao": "one short English sentence describing the specific action happening in THIS scene, using the registered character names. Max 25 words. Example: Beni holding a brown teddy bear in one hand and a red toy car in the other, tears on his face",\n'
+      +'  "personagensPresentes": ["Name1", "Name2"]\n'
+      +'}\n\n'
+      +'Rules:\n'
+      +'- personagensPresentes: ONLY include names from the registered characters list. Do NOT invent characters. If only the protagonist is mentioned, return only the protagonist.\n'
+      +'- objetos: ONLY include things that are NOT registered characters but ARE visually important in this scene (toys, creatures, imaginary monsters, magical items, shadows described as characters). Leave empty [] if nothing relevant.\n'
+      +'- If the text mentions a "monster", "shadow", "creature" that is actually imaginary or a misperception (revealed later as just a shadow), still describe it visually for THIS scene.\n'
+      +'- acao: describe what is happening visually in THIS specific scene using action verbs. This is the most important field.\n'
+      +'- All text values (cenario, tipo, descricao, acao) must be in English. Only "nome" stays in Portuguese.\n';
+
     var res=await fetch('https://squishbook-backend-v2.onrender.com/api/historia',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:100,messages:[{role:'user',content:prompt}]})
+      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:600,messages:[{role:'user',content:prompt}]})
     });
-    if(!res.ok) return fallback;
+    if(!res.ok) return fallbackObj;
     var data=await res.json();
     var txt=data.content&&data.content[0]&&data.content[0].text;
-    if(txt&&txt.trim().length>10) return txt.trim().replace(/["""]/g,'').replace(/^[^a-zA-Z]+/,'');
-    return fallback;
-  }catch(e){ return fallback; }
+    if(!txt) return fallbackObj;
+    // Remove fences de markdown se vierem
+    txt=txt.trim().replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+    var parsed;
+    try{ parsed=JSON.parse(txt); }catch(e){ return fallbackObj; }
+    if(!parsed||typeof parsed!=='object') return fallbackObj;
+    var out={
+      cenario:(parsed.cenario&&typeof parsed.cenario==='string'&&parsed.cenario.trim().length>10)?parsed.cenario.trim().replace(/["""]/g,''):fallbackCenario,
+      objetos:Array.isArray(parsed.objetos)?parsed.objetos.filter(function(o){return o&&o.descricao&&typeof o.descricao==='string';}).slice(0,5):[],
+      acao:(parsed.acao&&typeof parsed.acao==='string')?parsed.acao.trim().replace(/["""]/g,''):'',
+      personagensPresentes:Array.isArray(parsed.personagensPresentes)?parsed.personagensPresentes.filter(function(n){return typeof n==='string';}):[]
+    };
+    return out;
+  }catch(e){ return fallbackObj; }
+}
+
+// Wrapper antigo (mantido por compatibilidade se algum trecho ainda chamar)
+async function gerarDescricaoCenario(texto, titulo, roteiro){
+  var r=await extrairElementosDaCena(texto, titulo, roteiro, []);
+  return r.cenario;
 }
 
 async function gerarCenaPaginaComRetry(pg, idx){
-  // Tenta gerar a cena com retry automatico
-  for(var tentativa=0;tentativa<2;tentativa++){
+  // FIX BUG 3: 3 tentativas com backoff exponencial (2s, 5s, 10s)
+  var delays=[2000, 5000, 10000];
+  for(var tentativa=0;tentativa<3;tentativa++){
+    var t0=Date.now();
     try{
       var resultado=await gerarCenaPagina(pg,idx);
-      if(resultado.url) return resultado; // sucesso
-      // Se falhou mas sem exception, tenta novamente
-      if(tentativa===0) await new Promise(function(r){setTimeout(r,2000);});
+      if(resultado.url){
+        if(tentativa>0) logGeracao({tipo:'cena',cena_idx:idx,status:'sucesso_retry',tentativa:tentativa+1,duracao_ms:Date.now()-t0});
+        return resultado; // sucesso
+      }
+      logGeracao({tipo:'cena',cena_idx:idx,status:'url_vazia',tentativa:tentativa+1,duracao_ms:Date.now()-t0});
+      if(tentativa<2) await new Promise(function(r){setTimeout(r,delays[tentativa]);});
     }catch(e){
-      if(tentativa===0) await new Promise(function(r){setTimeout(r,2000);});
+      logGeracao({tipo:'cena',cena_idx:idx,status:'exception',tentativa:tentativa+1,erro_msg:(e&&e.message)||'',duracao_ms:Date.now()-t0});
+      if(tentativa<2) await new Promise(function(r){setTimeout(r,delays[tentativa]);});
     }
   }
-  // Fallback final: gera cena simples sem referencia de avatar
+  // FIX BUG 4: fallback final - se também falhar, marca como FALHA_FINAL
+  // Não entregar fallback genérico "faz de conta" como se fosse sucesso.
+  // O chamador deve bloquear a entrega do PDF quando erro=true.
   try{
     var textoFallback=pg.texto||pg.titulo||'';
     var nomeProt=ST.personagens[0].nome||'o protagonista';
@@ -1924,14 +2248,22 @@ async function gerarCenaPaginaComRetry(pg, idx){
       +(textoFallback.substring(0,100)+'. ')
       +'Art style: soft pastel watercolor, warm magical lighting, professional storybook illustration. '
       +'NO text, NO watermark.';
+    var t0f=Date.now();
     var rf=await fetch('https://squishbook-backend-v2.onrender.com/api/avatar',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'fal-ai/flux-pro',payload:{prompt:promptFallback,num_images:1,image_size:'landscape_4_3',loras:[{path:LORA_URL,scale:LORA_SCALE}]}}),
     });
     var df=await rf.json();
     var urlF=df.images&&df.images[0]&&df.images[0].url;
-    return {pg:pg,idx:idx,url:urlF||null,erro:!urlF};
+    if(urlF){
+      logGeracao({tipo:'cena',cena_idx:idx,status:'fallback_generico',duracao_ms:Date.now()-t0f,url_gerada:urlF});
+      // IMPORTANTE: mesmo com fallback ok, marca flag para o chamador saber que foi degradada
+      return {pg:pg,idx:idx,url:urlF,erro:false,fallback:true};
+    }
+    logGeracao({tipo:'cena',cena_idx:idx,status:'falha_final',duracao_ms:Date.now()-t0f,erro_msg:(df&&df.erro)||'sem imagem'});
+    return {pg:pg,idx:idx,url:null,erro:true};
   }catch(e){
+    logGeracao({tipo:'cena',cena_idx:idx,status:'falha_final_exception',erro_msg:(e&&e.message)||''});
     return {pg:pg,idx:idx,url:null,erro:true};
   }
 }
@@ -2039,7 +2371,139 @@ async function gerarCenaPagina(pg,idx){
   }
 
   // Gera descrição do cenário via IA com base no texto real da página
-  var cenario = await gerarDescricaoCenario(pg.texto||'', pg.titulo||'', roteiro);
+  // Extrai TUDO via Claude: cenário + objetos narrativos + ação específica + personagens presentes
+  var elementos = await extrairElementosDaCena(pg.texto||'', pg.titulo||'', roteiro, parsNaPg);
+  var cenario = elementos.cenario;
+
+  // FIX BUG 7: validação estrita - filtra nomes inventados do personagensPresentes
+  // O Claude às vezes alucina terceiro personagem. Aqui remove qualquer nome que
+  // NÃO existe no cadastro, antes de usar a lista.
+  var nomesCadastrados = parsNaPg.map(function(p){return (p.nome||'').toLowerCase().split(' ')[0];}).filter(function(n){return n;});
+  if(elementos.personagensPresentes && elementos.personagensPresentes.length>0){
+    var nomesValidos = elementos.personagensPresentes.filter(function(n){
+      var nLower = (n||'').toLowerCase();
+      return nomesCadastrados.some(function(cad){
+        return nLower.indexOf(cad)>=0 || cad.indexOf(nLower)>=0;
+      });
+    });
+    elementos.personagensPresentes = nomesValidos;
+
+    // Agora refina parsNaPg (protagonista sempre fica) - usando só nomes validados
+    if(nomesValidos.length>0){
+      var nomesPresentes=nomesValidos.map(function(n){return n.toLowerCase();});
+      var refinado=parsNaPg.filter(function(p){
+        if(p.papel==='protagonista') return true;
+        var primNome=(p.nome||'').toLowerCase().split(' ')[0];
+        for(var np=0;np<nomesPresentes.length;np++){
+          if(nomesPresentes[np].indexOf(primNome)>=0||primNome.indexOf(nomesPresentes[np])>=0) return true;
+        }
+        return false;
+      });
+      if(refinado.length>0) parsNaPg=refinado;
+    }
+  }
+
+  // Monta string de objetos narrativos para injetar nos prompts
+  var objetosStr='';
+  if(elementos.objetos && elementos.objetos.length>0){
+    objetosStr=' ALSO IN SCENE (non-character objects): '+elementos.objetos.map(function(o){return o.descricao;}).join('; ')+'.';
+  }
+
+  // Ação específica retornada pela Claude (sobrescreve acaoConjunta quando disponível)
+  var acaoEspecifica = elementos.acao && elementos.acao.length>10 ? elementos.acao : acaoConjunta;
+
+  // FIX #1 (22/04): negative_prompt NATIVO do fal-pulid (mais forte que texto no positivo).
+  // Mantemos uma versão curta no positivo só para anti-alucinação de personagens
+  // (que funciona melhor como regra positiva); o resto vai no negative_prompt nativo.
+  var negativeExtra = ' AVOID: extra characters not listed, invented children, random people, duplicate character, stuffed toy drawn as human person, teddy bear rendered as a child.';
+
+  // Negative prompt nativo — será passado como parâmetro `negative_prompt` do fal-pulid/flux.
+  // Começa com regras base anti-artefato; regras de idade são acrescentadas abaixo só
+  // quando a cena tem mistura adulto+criança (evita penalizar cenas de 1 criança sozinha).
+  var negativePromptFal = 'low quality, blurry, distorted, deformed, ugly, bad anatomy, extra limbs, mutated hands, '
+    + 'text, watermark, signature, logo, letters, words, '
+    + 'dirty face, smudges on face, stains on cheeks, green marks on skin, brown spots on face, '
+    + 'white background cutout, pasted-on look, collage artifact, floating characters, '
+    + 'duplicate character, cloned faces, multiple protagonists';
+
+  // FIX BUG 5: detecta gênero+idade de CADA personagem individualmente.
+  // Antes só o protagonista tinha generoRef, causando Papai virar criança.
+  function detectaGeneroFaixa(p){
+    var g='', f='';
+    // gênero
+    if(p.genero==='masculino') g='male';
+    else if(p.genero==='feminino') g='female';
+    else {
+      var nomeL=(p.nome||'').toLowerCase();
+      var nomesFem=['ana','sofia','valentina','alice','julia','laura','isabela','maria','gabriela','beatriz','leticia','manuela','heloisa','camila','fernanda','clara','livia','vitoria','lorena','bruna','aline','paula','elisa','lara','luna','isis','maya','mia','mae','mamae','vovo','tia'];
+      var nomesMasc=['papai','pai','vovo','tio','avo'];
+      if(nomesFem.some(function(n){return nomeL.startsWith(n);})) g='female';
+      else if(nomesMasc.some(function(n){return nomeL.indexOf(n)>=0;})) g='male';
+      else if(nomeL.endsWith('a')) g='female';
+      else g='male';
+    }
+    // faixa etária
+    if(p.faixaEtaria==='bebe') f='baby/toddler';
+    else if(p.faixaEtaria==='crianca') f='child';
+    else if(p.faixaEtaria==='adolescente') f='teenager';
+    else if(p.faixaEtaria==='adulto') f='adult';
+    else if(p.faixaEtaria==='idoso') f='elderly';
+    else {
+      // Inferência pelo papel
+      if(p.papel==='protagonista') f='child';
+      else if(p.papel==='familiar') f='adult';
+      else f='child';
+    }
+    return {genero: g, faixa: f};
+  }
+
+  // generoRef mantido só para o protagonista (compatibilidade com prompts de 1 avatar)
+  var generoRef='';
+  var proto0=parsNaPg.filter(function(p){return p.papel==='protagonista';})[0]||parsNaPg[0];
+  if(proto0){
+    var gfProto = detectaGeneroFaixa(proto0);
+    if(gfProto.genero==='male' && gfProto.faixa==='child') generoRef='BOY child character, male, masculine features. ';
+    else if(gfProto.genero==='female' && gfProto.faixa==='child') generoRef='GIRL child character, female, feminine features. ';
+    else if(gfProto.genero==='male') generoRef='MALE '+gfProto.faixa+' character, masculine features. ';
+    else generoRef='FEMALE '+gfProto.faixa+' character, feminine features. ';
+  }
+
+  // descricaoPorPersonagem: array com descrição detalhada por personagem (usado para cenas multi-char)
+  var descricaoPorPersonagem = parsNaPg.map(function(p){
+    var gf = detectaGeneroFaixa(p);
+    var tipo = gf.genero+' '+gf.faixa;
+    var papel = '';
+    if(p.papel==='protagonista') papel='main child protagonist';
+    else if(p.papel==='familiar'){
+      if(gf.faixa==='adult' && gf.genero==='female') papel='adult mother/female parent';
+      else if(gf.faixa==='adult' && gf.genero==='male') papel='adult father/male parent';
+      else if(gf.faixa==='elderly' && gf.genero==='female') papel='elderly grandmother';
+      else if(gf.faixa==='elderly' && gf.genero==='male') papel='elderly grandfather';
+      else papel='family member ('+tipo+')';
+    } else papel='companion character ('+tipo+')';
+    return {nome: p.nome, tipo: tipo, papel: papel, genero: gf.genero, faixa: gf.faixa};
+  });
+
+  // FIX BUG 5 adicional: se cena tem adulto/idoso junto com criança, reforça negativo
+  // pra evitar que o modelo renderize o adulto como criança (bug recorrente do pulid).
+  var temAdulto = descricaoPorPersonagem.some(function(d){return d.faixa==='adult' || d.faixa==='elderly' || d.faixa==='teenager';});
+  var temCrianca = descricaoPorPersonagem.some(function(d){return d.faixa==='child' || d.faixa==='baby/toddler';});
+  // FIX #1 (22/04): regra de idade vai pro negative_prompt NATIVO do fal-pulid
+  // (sinal mais forte que texto enfiado no positivo). Mantemos reforço mínimo no
+  // positivo pra balancear, mas a carga pesada fica no negative_prompt.
+  var reforcoIdadePositivo = '';
+  if(temAdulto && temCrianca){
+    negativePromptFal += ', adult rendered as child, father as boy, mother as girl, '
+      + 'grandmother as girl, grandfather as boy, baby rendered as adult, '
+      + 'all characters same height, all characters same age, '
+      + 'adults with child proportions, adults with small body, adults shrunk to child size, '
+      + 'teen rendered as child, teenager as baby';
+    reforcoIdadePositivo = ' AGE HIERARCHY: adults are visibly taller than children (adult head reaches much higher), '
+      + 'adults have mature adult bodies (broader shoulders, longer limbs, adult face shape), '
+      + 'children are visibly smaller, elderly characters have gray/white hair and mature features, '
+      + 'babies are small and held or supported.';
+  }
+
 
   // Atmosfera
   var atmosfera;
@@ -2063,15 +2527,19 @@ async function gerarCenaPagina(pg,idx){
       // ── Nenhum avatar: gera cena completa com flux/schnell ──────────────────
       var descs=parsNaPg.map(function(p,i){return descreverPersonagemParaPrompt(p,expressao,i===0);}).join(' and ');
       var prompt='Squishbook childrens book illustration. '
-        +'SCENE: '+descs+(parsNaPg.length>=2?' '+acaoConjunta:'.')+' '
-        +'SETTING: '+cenario+'. '
+        +generoRef
+        +'ACTION: '+acaoEspecifica+'. '
+        +'CHARACTERS: '+descs+'. '
+        +'SETTING: '+cenario+'.'+objetosStr+' '
         +atmosfera+'. '
+        +reforcoIdadePositivo
         +'Art style: soft pastel watercolor, warm magical lighting, professional storybook illustration, '
-        +'chibi kawaii characters fully integrated into the background scene, no white background, no cutouts. '
-        +'NO text, NO watermark.';
+        +'chibi kawaii characters fully integrated into the background scene, no white background, no cutouts.'
+        +negativeExtra
+        +' NO text, NO watermark.';
       var r1=await fetch('https://squishbook-backend-v2.onrender.com/api/avatar',{
         method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({model:'fal-ai/flux-pro',payload:{prompt:TRIGGER+' '+prompt,num_images:1,image_size:'landscape_4_3',loras:[{path:LORA_URL,scale:LORA_SCALE}]}})
+        body:JSON.stringify({model:'fal-ai/flux-pro',payload:{prompt:TRIGGER+' '+prompt,negative_prompt:negativePromptFal,num_images:1,image_size:'landscape_4_3',loras:[{path:LORA_URL,scale:LORA_SCALE}]}})
       });
       var d1=await r1.json();
       cenaUrl=d1.images&&d1.images[0]&&d1.images[0].url;
@@ -2079,51 +2547,57 @@ async function gerarCenaPagina(pg,idx){
     } else if(parsComAvatar.length===1){
       // ── 1 avatar disponível: flux-pulid para máxima fidelidade ─────────────
       var p0=parsComAvatar[0];
-      // Descreve quem é o personagem de referência para o modelo entender o contexto
+      var gfP0 = detectaGeneroFaixa(p0);
+      // Descreve quem é o personagem de referência COM gênero e idade explícitos
       var qualPersonagem = p0.papel==='protagonista'
-        ? 'the child protagonist ('+p0.nome+')'
-        : 'the '+(p0.papel==='familiar'?'parent/family member':'secondary character')+' ('+p0.nome+')';
-      var descOutros=parsSeAvatar.length>0
-        ? ' Also in the scene: '+parsSeAvatar.map(function(p,i){
-            var desc=descreverPersonagemParaPrompt(p,expressao,false);
-            var roleDesc=p.papel==='familiar'?'family member/parent':'companion';
-            return desc+' (named '+p.nome+', a '+roleDesc+' character who MUST appear in this scene)';
-          }).join(' and ')+','
-        : '';
-      var acaoDesc=parsNaPg.length>=2?' '+acaoConjunta+',':'';
-      // Determina se o personagem de referência é o protagonista ou o familiar
-      var isProtRef = p0.papel === 'protagonista';
-      var outroDesc = parsSeAvatar.length > 0 || (parsNaPg.length > 1 && parsComAvatar.length === 1)
-        ? ' IMPORTANT: The scene MUST show BOTH '+p0.nome+' AND '
-          + parsNaPg.filter(function(px){return px!==p0;}).map(function(px){return px.nome;}).join(' and ')
-          + ' together in the same scene.'
-        : '';
-      var nomesSec = parsNaPg.filter(function(px){return px!==p0;}).map(function(px){return px.nome;}).join(' and ');
-      // Monta descrição física detalhada do personagem secundário para forçar presença
-      var secDesc = parsNaPg.filter(function(px){return px!==p0;}).map(function(px){
-        return descreverPersonagemParaPrompt(px, expressao, false);
-      }).join(' and ');
-      var nomesSec2 = parsNaPg.filter(function(px){return px!==p0;}).map(function(px){return px.nome;}).join(' and ');
+        ? 'the '+gfP0.genero+' '+gfP0.faixa+' protagonist named '+p0.nome
+        : 'the '+gfP0.genero+' '+gfP0.faixa+' ('+p0.papel+') named '+p0.nome;
+
+      // FIX BUG 5: para personagens SEM avatar, descrever explicitamente com gênero+idade
+      // para o modelo não desenhar todos como crianças.
+      var secundarios = parsNaPg.filter(function(px){return px!==p0;});
+      var descSecExplicita = secundarios.map(function(px){
+        var gf = detectaGeneroFaixa(px);
+        var desc = descreverPersonagemParaPrompt(px,expressao,false);
+        var roleDesc='';
+        if(px.papel==='familiar' && gf.faixa==='adult' && gf.genero==='female') roleDesc='adult woman (mother)';
+        else if(px.papel==='familiar' && gf.faixa==='adult' && gf.genero==='male') roleDesc='adult man (father)';
+        else if(px.papel==='familiar' && gf.faixa==='elderly' && gf.genero==='female') roleDesc='elderly woman (grandmother)';
+        else if(px.papel==='familiar' && gf.faixa==='elderly' && gf.genero==='male') roleDesc='elderly man (grandfather)';
+        else roleDesc=gf.genero+' '+gf.faixa;
+        return 'named '+px.nome+': '+roleDesc+' ('+desc+')';
+      }).join('; AND ');
+      var nomesSec2 = secundarios.map(function(px){return px.nome;}).join(' and ');
+
       var prompt2=''
-        +'SCENE: '+acaoConjunta+'. '
-        +'SETTING: '+cenario+'. '
+        +'ACTION: '+acaoEspecifica+'. '
+        +'SETTING: '+cenario+'.'+objetosStr+' '
         +atmosfera+'. '
         +'CHARACTER 1 (reference photo): '+qualPersonagem+'. '
-        +(nomesSec2?'CHARACTER 2 (draw from text description): '+secDesc+', named '+nomesSec2+', MUST be visible in this scene. ':'')
-        +'Both characters MUST appear in the image. '
+        +(descSecExplicita?'CHARACTER 2 (draw from description, DIFFERENT from character 1): '+descSecExplicita+'. MUST be visible in scene. ':'')
+        +(parsNaPg.length>=2?'CRITICAL: Characters have DIFFERENT ages and genders as described above. Do NOT make them look the same. ':'')
+        +reforcoIdadePositivo
         +'Squishbook chibi kawaii art style, soft pastel watercolor, warm magical lighting, professional childrens book illustration. '
-        +'Both characters fully visible from head to toe, chibi proportions, integrated into background. '
-        +'NO text, NO watermark.';
+        +'Characters fully visible from head to toe, chibi proportions, integrated into background.'
+        +negativeExtra
+        +' NO text, NO watermark.';
       var ctrl2=new AbortController();
-      var tmout2=setTimeout(function(){ctrl2.abort();},90000);
+      // FIX #4 (22/04): timeout 120s → 150s. O backend tem retry de 3x com
+      // backoff (timeout inicial 90s), se o frontend aborta em 120s o retry
+      // do backend é cortado e cai no composite estático. 150s dá margem.
+      var tmout2=setTimeout(function(){ctrl2.abort();},150000);
+      var t0cena=Date.now();
       var r2=await fetch('https://squishbook-backend-v2.onrender.com/api/avatar',{
         method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({model:'fal-ai/flux-pulid',payload:{prompt:TRIGGER+' '+prompt2,reference_image_url:p0.avatarUrl,num_images:1,image_size:'landscape_4_3',guidance_scale:4,num_inference_steps:30,loras:[{path:LORA_URL,scale:LORA_SCALE}]}}),
+        body:JSON.stringify({model:'fal-ai/flux-pulid',payload:{prompt:TRIGGER+' '+prompt2,negative_prompt:negativePromptFal,reference_image_url:p0.avatarUrl,num_images:1,image_size:'landscape_4_3',guidance_scale:7,num_inference_steps:30,loras:[{path:LORA_URL,scale:LORA_SCALE}]}}),
         signal:ctrl2.signal
       });
       clearTimeout(tmout2);
       var d2=await r2.json();
       cenaUrl=d2.images&&d2.images[0]&&d2.images[0].url;
+      if(!r2.ok || !cenaUrl){
+        logGeracao({tipo:'cena',cena_idx:idx,status:'pulid_falhou',modelo:'fal-ai/flux-pulid',duracao_ms:Date.now()-t0cena,erro_msg:(d2.erro||'status '+r2.status+' '+JSON.stringify(d2).substring(0,200))});
+      }
 
       // Fallback: se flux-pulid falhou, usa composite manual com remoção de fundo
       if(!cenaUrl){
@@ -2139,46 +2613,74 @@ async function gerarCenaPagina(pg,idx){
 
     } else {
       // ── 2+ avatares: usa pulid para o protagonista + composite para os demais ──
-      // Estratégia: gera a cena principal com flux-pulid usando o avatar do protagonista,
-      // depois tenta composite dos demais por cima. Se falhar, usa composite puro.
       var prot2=parsComAvatar.filter(function(p){return p.papel==='protagonista';})[0]||parsComAvatar[0];
+      var gfProt2 = detectaGeneroFaixa(prot2);
       var outros2=parsComAvatar.filter(function(p){return p!==prot2;});
-      var descOutros2=outros2.length>0
-        ? ' Also in the scene: '+outros2.map(function(p){
-            return descreverPersonagemParaPrompt(p,expressao,false)+' (this is '+p.nome+', a real character from the story)';
-          }).join(' and ')+','
+
+      // FIX BUG 5: descreve cada personagem secundário com gênero+idade explícitos
+      var descOutros2 = outros2.length>0
+        ? outros2.map(function(p){
+            var gf = detectaGeneroFaixa(p);
+            var desc = descreverPersonagemParaPrompt(p,expressao,false);
+            var roleDesc = gf.genero+' '+gf.faixa;
+            if(p.papel==='familiar' && gf.faixa==='adult' && gf.genero==='female') roleDesc='adult woman (mother)';
+            else if(p.papel==='familiar' && gf.faixa==='adult' && gf.genero==='male') roleDesc='adult man (father)';
+            else if(p.papel==='familiar' && gf.faixa==='elderly' && gf.genero==='female') roleDesc='elderly woman (grandmother)';
+            else if(p.papel==='familiar' && gf.faixa==='elderly' && gf.genero==='male') roleDesc='elderly man (grandfather)';
+            return 'named '+p.nome+': '+roleDesc+' ('+desc+')';
+          }).join('; AND ')
         : '';
-      var descSemAv2=parsSeAvatar.length>0
-        ? ' And: '+parsSeAvatar.map(function(p){
-            return descreverPersonagemParaPrompt(p,expressao,false)+' ('+p.nome+', '+p.papel+')';
-          }).join(' and ')+','
+      var descSemAv2 = parsSeAvatar.length>0
+        ? parsSeAvatar.map(function(p){
+            var gf = detectaGeneroFaixa(p);
+            var desc = descreverPersonagemParaPrompt(p,expressao,false);
+            var roleDesc = gf.genero+' '+gf.faixa;
+            if(p.papel==='familiar' && gf.faixa==='adult' && gf.genero==='female') roleDesc='adult woman (mother)';
+            else if(p.papel==='familiar' && gf.faixa==='adult' && gf.genero==='male') roleDesc='adult man (father)';
+            else if(p.papel==='familiar' && gf.faixa==='elderly' && gf.genero==='female') roleDesc='elderly woman (grandmother)';
+            else if(p.papel==='familiar' && gf.faixa==='elderly' && gf.genero==='male') roleDesc='elderly man (grandfather)';
+            return 'named '+p.nome+': '+roleDesc+' ('+desc+')';
+          }).join('; AND ')
         : '';
-      var acaoDesc2=parsNaPg.length>=2?' '+acaoConjunta+',':'';
-      // Descreve os outros personagens de forma muito explícita para o modelo
-      var nomeOutros2=outros2.map(function(p){return p.nome+'('+p.papel+')';}).join(' and ');
+
+      var qualProt2 = prot2.papel==='protagonista'
+        ? 'the '+gfProt2.genero+' '+gfProt2.faixa+' protagonist named '+prot2.nome
+        : 'the '+gfProt2.genero+' '+gfProt2.faixa+' ('+prot2.papel+') named '+prot2.nome;
+
       var promptMulti=''
-        +'SCENE: '+acaoConjunta+'. '
-        +'SETTING: '+cenario+'. '
+        +'ACTION: '+acaoEspecifica+'. '
+        +'SETTING: '+cenario+'.'+objetosStr+' '
         +atmosfera+'. '
-        +'CHARACTER 1 (reference photo): '+prot2.nome+', the '+(prot2.papel==='protagonista'?'child protagonist':'main character')+'. '
-        +(nomeOutros2?'CHARACTER 2 (draw from text description): '+descOutros2+', named '+nomeOutros2+', MUST be visible in this scene. ':'')
-        +(descSemAv2?'ADDITIONAL CHARACTERS: '+descSemAv2:'')
-        +'Both characters MUST appear in the image. '
+        +'CHARACTER 1 (reference photo): '+qualProt2+'. '
+        +(descOutros2?'CHARACTER 2 (draw from description, DIFFERENT age/gender from character 1): '+descOutros2+'. MUST be visible. ':'')
+        +(descSemAv2?'ADDITIONAL CHARACTERS (draw from description): '+descSemAv2+'. ':'')
+        +'CRITICAL: Each character has DIFFERENT age and gender as described. Do NOT make them all look the same. '
+        +reforcoIdadePositivo
         +'Squishbook chibi kawaii art style, soft pastel watercolor, warm magical lighting, professional childrens book illustration. '
-        +'Both characters fully visible from head to toe, chibi proportions, integrated into background. '
-        +'NO text, NO watermark.';
+        +'Characters fully visible from head to toe, chibi proportions, integrated into background.'
+        +negativeExtra
+        +' NO text, NO watermark.';
       var ctrlM=new AbortController();
-      var tmoutM=setTimeout(function(){ctrlM.abort();},90000);
+      // FIX #4 (22/04): 120s → 150s (idem pulid 1-avatar).
+      var tmoutM=setTimeout(function(){ctrlM.abort();},150000);
+      var t0multi=Date.now();
       try{
         var rM=await fetch('https://squishbook-backend-v2.onrender.com/api/avatar',{
           method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({model:'fal-ai/flux-pulid',payload:{prompt:TRIGGER+' '+promptMulti,reference_image_url:prot2.avatarUrl,num_images:1,image_size:'landscape_4_3',guidance_scale:4,num_inference_steps:30,loras:[{path:LORA_URL,scale:LORA_SCALE}]}}),
+          body:JSON.stringify({model:'fal-ai/flux-pulid',payload:{prompt:TRIGGER+' '+promptMulti,negative_prompt:negativePromptFal,reference_image_url:prot2.avatarUrl,num_images:1,image_size:'landscape_4_3',guidance_scale:7,num_inference_steps:30,loras:[{path:LORA_URL,scale:LORA_SCALE}]}}),
           signal:ctrlM.signal
         });
         clearTimeout(tmoutM);
         var dM=await rM.json();
         cenaUrl=dM.images&&dM.images[0]&&dM.images[0].url;
-      }catch(e){ clearTimeout(tmoutM); cenaUrl=null; }
+        if(!rM.ok || !cenaUrl){
+          logGeracao({tipo:'cena',cena_idx:idx,status:'pulid_multi_falhou',modelo:'fal-ai/flux-pulid',duracao_ms:Date.now()-t0multi,erro_msg:(dM.erro||'status '+rM.status)});
+        }
+      }catch(e){
+        clearTimeout(tmoutM);
+        cenaUrl=null;
+        logGeracao({tipo:'cena',cena_idx:idx,status:'pulid_multi_exception',modelo:'fal-ai/flux-pulid',duracao_ms:Date.now()-t0multi,erro_msg:(e&&e.message)||''});
+      }
 
       // Fallback: composite puro se pulid falhou
       if(!cenaUrl){
@@ -2209,6 +2711,44 @@ async function gerarCenaPagina(pg,idx){
     console.error('Erro cena '+idx,e&&e.message?e.message:e);
     return {pg:pg,idx:idx,url:null,erro:true};
   }
+}
+
+// FIX #5 (22/04): remoção de fundo profissional via fal-ai/birefnet-v2.
+// Elimina as manchas verdes/marrons nos rostos do Beni que apareciam quando
+// caía no composite (flood fill local deixava artefatos em fundos com
+// degradê ou cores similares à pele). Retorna canvas pronto pro composite;
+// se falhar, chamador faz fallback pra removerFundoBranco local.
+async function removerFundoViaFal(imgUrl){
+  try{
+    var ctrl=new AbortController();
+    var tmout=setTimeout(function(){ctrl.abort();},30000);
+    var r=await fetch('https://squishbook-backend-v2.onrender.com/api/avatar',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'fal-ai/birefnet-v2',
+        payload:{image_url:imgUrl}
+      }),
+      signal:ctrl.signal
+    });
+    clearTimeout(tmout);
+    if(!r.ok) return null;
+    var d=await r.json();
+    // birefnet-v2 retorna image.url (singular) ou images[0].url
+    var outUrl=(d.image&&d.image.url)||(d.images&&d.images[0]&&d.images[0].url);
+    if(!outUrl) return null;
+    return new Promise(function(resolve){
+      var img=new Image();
+      img.crossOrigin='anonymous';
+      img.onload=function(){
+        var cv=document.createElement('canvas');
+        cv.width=img.width; cv.height=img.height;
+        cv.getContext('2d').drawImage(img,0,0);
+        resolve(cv);
+      };
+      img.onerror=function(){resolve(null);};
+      img.src=outUrl;
+    });
+  }catch(e){ return null; }
 }
 
 // Remove o fundo branco/claro de uma imagem de avatar usando canvas
@@ -2324,8 +2864,13 @@ async function compositeComRemocaoFundo(cenarioUrl, avatarPersonagens, totalPars
         var av=avatarPersonagens[i];
         var pos=posicoes[i];
 
-        // Remove fundo branco do avatar
-        var avCanvas=await removerFundoBranco(av.avatarUrl);
+        // FIX #5 (22/04): tenta remoção profissional via fal-ai/birefnet-v2
+        // primeiro. Se falhar (timeout, saldo, etc), cai no flood fill local
+        // pra não bloquear entrega. O birefnet elimina as manchas verdes/marrons
+        // que apareciam nos rostos quando o fundo original tinha cores próximas
+        // à pele (rosa/bege).
+        var avCanvas=await removerFundoViaFal(av.avatarUrl);
+        if(!avCanvas) avCanvas=await removerFundoBranco(av.avatarUrl);
         if(!avCanvas) continue;
 
         // Sombra suave
@@ -2722,28 +3267,22 @@ async function gerarPDFReal(){
     var cena=POS.cenasGeradas[i];
     var pg2=cena.pg;
     var bgCol=i%2===0?pal.pg1:pal.pg2;
-    var layout=i%3;
-    var imgHtml2='';
-    if(cena.url){
-      var imgStyle='border-radius:16px;object-fit:cover;box-shadow:0 6px 24px rgba(0,0,0,.15);border:3px solid rgba(255,255,255,.9);';
-      if(layout===1) imgHtml2='<img src="'+cena.url+'" style="'+imgStyle+'width:100%;height:220px;object-fit:cover;display:block;margin-bottom:16px"/>';
-      else imgHtml2='<img src="'+cena.url+'" style="'+imgStyle+'width:200px;height:160px;object-fit:cover;flex-shrink:0"/>';
-    }
-    var numBadge='<div style="display:inline-block;background:'+pal.acc+';color:white;font-size:8px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;padding:4px 14px;border-radius:20px;margin-bottom:12px;font-family:Arial,sans-serif">PAGINA '+(i+1)+'</div>';
-    var titDiv='<div style="font-size:17px;font-weight:900;color:'+pal.acc2+';margin-bottom:12px;line-height:1.2;font-family:Arial,sans-serif">'+(pg2.titulo||'')+'</div>';
-    var txtDiv='<div style="font-size:12px;color:'+txColor+';line-height:2;font-style:italic;font-family:Arial,sans-serif">'+(pg2.texto||'').replace(/\n\n/g,'<br/><br/>').replace(/\n/g,'<br/>')+'</div>';
-    var rodape='<div style="position:absolute;bottom:0;left:0;right:0;height:32px;background:linear-gradient(90deg,'+pal.bg1+','+pal.bg2+');display:flex;align-items:center;justify-content:center"><span style="font-size:8px;color:rgba(255,255,255,.35);letter-spacing:.2em;text-transform:uppercase;font-family:Arial,sans-serif">SQUISHBOOK</span></div>';
-    var inner='';
-    if(layout===1){
-      inner=imgHtml2+'<div>'+numBadge+titDiv+txtDiv+'</div>';
-    } else {
-      var flex='display:flex;gap:24px;align-items:flex-start;'+(layout===2?'flex-direction:row-reverse;':'');
-      inner='<div style="'+flex+'">'+imgHtml2+'<div style="flex:1">'+numBadge+titDiv+txtDiv+'</div></div>';
-    }
-    var pgHtml='<div style="width:595px;height:842px;background:'+bgCol+';padding:36px 40px 60px;position:relative;overflow:hidden;box-sizing:border-box">'
-      +decors[i%6]
-      +'<div style="position:relative;z-index:1">'+inner+'</div>'
-      +rodape+'</div>';
+    // LAYOUT LIVRO INFANTIL: imagem 60% topo, texto 40% base
+    var imgAreaHtml=cena.url
+      ?'<img src="'+cena.url+'" style="position:absolute;top:0;left:0;width:100%;height:505px;object-fit:cover;display:block;"/>'
+      :'<div style="position:absolute;top:0;left:0;width:100%;height:505px;background:linear-gradient(135deg,'+pal.bg2+','+pal.bg3+');display:flex;align-items:center;justify-content:center;"><span style="font-size:5rem;opacity:.3">✨</span></div>';
+    var numBadge='<div style="display:inline-block;background:'+pal.acc+';color:white;font-size:9px;font-weight:900;letter-spacing:.12em;text-transform:uppercase;padding:5px 16px;border-radius:20px;margin-bottom:9px;font-family:Arial,sans-serif;">PÁGINA '+(i+1)+'</div>';
+    var titDiv='<div style="font-size:18px;font-weight:900;color:'+pal.acc2+';margin-bottom:9px;line-height:1.2;font-family:Arial,sans-serif;">'+(pg2.titulo||'')+'</div>';
+    var txtDiv='<div style="font-size:13px;color:'+txColor+';line-height:1.9;font-style:italic;font-family:Arial,sans-serif;">'+(pg2.texto||'').replace(/\n\n/g,'<br/><br/>').replace(/\n/g,'<br/>')+'</div>';
+    var pgHtml='<div style="width:595px;height:842px;background:'+bgCol+';position:relative;overflow:hidden;box-sizing:border-box;">'
+      +imgAreaHtml
+      +'<div style="position:absolute;top:480px;left:0;right:0;height:30px;background:linear-gradient(to bottom,transparent,'+bgCol+');"></div>'
+      +'<div style="position:absolute;top:506px;left:0;right:0;bottom:36px;padding:14px 36px 10px;overflow:hidden;">'
+      +numBadge+titDiv+txtDiv
+      +'</div>'
+      +'<div style="position:absolute;bottom:0;left:0;right:0;height:36px;background:linear-gradient(90deg,'+pal.bg1+','+pal.bg2+');display:flex;align-items:center;justify-content:center;">'
+      +'<span style="font-size:8px;color:rgba(255,255,255,.35);letter-spacing:.2em;text-transform:uppercase;font-family:Arial,sans-serif;">SQUISHBOOK</span>'
+      +'</div></div>';
     pdf.addPage();
     var pgCanvas=await capturarPagina(pgHtml,bgCol);
     pdf.addImage(pgCanvas.toDataURL('image/jpeg',0.92),'JPEG',0,0,pgW,pgH);
@@ -2754,7 +3293,7 @@ async function gerarPDFReal(){
   var fimHtml='<div style="width:595px;height:842px;background:linear-gradient(150deg,'+pal.bg1+','+pal.bg3+');display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:48px;position:relative;overflow:hidden;box-sizing:border-box">'
     +'<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:320px;height:320px;border-radius:50%;background:rgba(255,255,255,.03)"></div>'
     +'<div style="position:relative;z-index:1">'
-    +'<div style="font-size:3.5rem;margin-bottom:20px">\u2665</div>'
+    +'<div style="font-size:3.5rem;margin-bottom:20px;color:rgba(255,255,255,.9);text-shadow:0 2px 8px rgba(0,0,0,.2)">\u2665</div>'
     +'<div style="font-size:28px;font-weight:900;color:white;margin-bottom:24px;font-family:Arial,sans-serif">Fim</div>'
     +(POS.mensagem?'<div style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:16px;padding:20px 26px;max-width:300px;margin:0 auto 20px"><div style="font-size:12px;color:rgba(255,255,255,.88);font-style:italic;line-height:1.9;font-family:Arial,sans-serif">&#x201C;'+POS.mensagem+'&#x201D;</div></div>':'')
     +'<div style="font-size:11px;color:rgba(255,255,255,.42);line-height:1.9;font-family:Arial,sans-serif">Este livro foi criado com amor<br/>especialmente para <strong style="color:rgba(255,255,255,.7)">'+proto.nome+'</strong>.</div>'
@@ -2855,7 +3394,7 @@ function gerarPDFFallback(){
     +'<div style="page-break-before:always;min-height:100vh;background:linear-gradient(150deg,'+pal.bg1+','+pal.bg3+');display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px;text-align:center;position:relative;overflow:hidden">'
     +'<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:420px;height:420px;border-radius:50%;background:rgba(255,255,255,.04)"></div>'
     +'<div style="position:relative;z-index:1">'
-    +'<div style="font-size:4rem;margin-bottom:24px">&hearts;</div>'
+    +'<div style="font-size:4rem;margin-bottom:24px;color:rgba(255,255,255,.9);text-shadow:0 2px 8px rgba(0,0,0,.2)">&hearts;</div>'
     +'<div style="font-family:\'Baloo 2\',cursive;font-size:30px;font-weight:900;color:white;margin-bottom:28px">Fim</div>'
     +(POS.mensagem?'<div style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:20px;padding:24px 30px;max-width:320px;margin:0 auto 28px"><div style="font-size:13px;color:rgba(255,255,255,.88);font-style:italic;line-height:1.95">&ldquo;'+POS.mensagem+'&rdquo;</div></div>':'')
     +'<div style="font-size:12px;color:rgba(255,255,255,.42);line-height:1.9">Este livro foi criado com amor<br/>especialmente para <strong style="color:rgba(255,255,255,.72)">'+proto.nome+'</strong>.</div>'
