@@ -3,7 +3,55 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
-<title>Squishbook — Criar meu livro</title>
+<title>Squishbook — Crie um Livro Infantil Personalizado com IA</title>
+<meta name="description" content="Crie um livro infantil personalizado com IA em minutos! Coloque a criança como protagonista, adicione família e amigos, e receba um livro único com ilustrações chibi kawaii. Digital R$79 ou impresso R$159."/>
+<meta name="keywords" content="livro infantil personalizado, livro personalizado com foto, livro infantil com IA, presente criativo para criança, squishbook, livro com nome da criança, livro chibi kawaii"/>
+<meta name="author" content="Squishbook"/>
+<meta name="robots" content="index, follow"/>
+<link rel="canonical" href="https://squishbook.com.br/criar.html"/>
+
+<!-- Open Graph / Facebook -->
+<meta property="og:type" content="website"/>
+<meta property="og:url" content="https://squishbook.com.br/criar.html"/>
+<meta property="og:title" content="Squishbook — Livro Infantil Personalizado com IA"/>
+<meta property="og:description" content="Crie um livro único onde a criança é a protagonista! Com ilustrações chibi geradas por IA, personagens reais e história exclusiva. Presente perfeito para crianças."/>
+<meta property="og:image" content="https://squishbook.com.br/og-image.jpg"/>
+<meta property="og:locale" content="pt_BR"/>
+<meta property="og:site_name" content="Squishbook"/>
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:title" content="Squishbook — Livro Infantil Personalizado com IA"/>
+<meta name="twitter:description" content="Crie um livro infantil personalizado com IA! A criança vira protagonista com ilustrações chibi kawaii únicas."/>
+<meta name="twitter:image" content="https://squishbook.com.br/og-image.jpg"/>
+
+<!-- Structured Data -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Product",
+  "name": "Squishbook — Livro Infantil Personalizado com IA",
+  "description": "Livro infantil personalizado com inteligência artificial, onde a criança é a protagonista com ilustrações chibi kawaii únicas.",
+  "brand": {"@type": "Brand", "name": "Squishbook"},
+  "url": "https://squishbook.com.br/criar.html",
+  "offers": [
+    {
+      "@type": "Offer",
+      "name": "Livro Digital",
+      "price": "79.00",
+      "priceCurrency": "BRL",
+      "availability": "https://schema.org/InStock"
+    },
+    {
+      "@type": "Offer",
+      "name": "Livro Impresso",
+      "price": "159.00",
+      "priceCurrency": "BRL",
+      "availability": "https://schema.org/InStock"
+    }
+  ]
+}
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Baloo+2:wght@400;600;700;800&display=swap" rel="stylesheet"/>
 <style>
 :root{--azul:#378ADD;--azul-esc:#185FA5;--azul-deep:#0C447C;--azul-cl:#B5D4F4;--azul-pal:#E6F1FB;--roxo:#AFA9EC;--roxo-esc:#7F77DD;--rosa:#ED93B1;--rosa-esc:#D4537E;--verde:#1D9E75;--texto:#1a1a2e;--texto-sec:#5a5a7a;--cinza:#f7fafd;--borda:#dbeeff;--erro:#e24b4a}
@@ -301,6 +349,7 @@ textarea:focus,input:focus{border-color:var(--azul)}
 }
 </style>
 <script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 </head>
 <body>
 <header class="header">
@@ -317,6 +366,11 @@ var PRECO_EXTRA = 9.90;
 var MAX_REGEN = 3;
 var nextId = 2;
 
+// LoRA Squishbook treinado
+var LORA_URL = 'https://v3b.fal.media/files/b/0a93a99c/tK0lOZmDhul1GBBMhmCcM_pytorch_lora_weights.safetensors';
+var LORA_SCALE = 1.0;
+var TRIGGER = 'SQUISHBOOK_CHIBI';
+
 var ST = {
   step: 1,
   personagens: [{id:1, nome:'', papel:'protagonista', fotoUrl:null, avatarUrl:null, avatarErro:false}],
@@ -326,9 +380,11 @@ var ST = {
   extras: 0,
   tipoHistoria: null, roteiro: null, historiaConta: '',
   respostas: {},
-  historia: {titulo:'', emoji:'', inicio:'', meio:'', fim:'', paginas:[]},
+  historia: {titulo:'', emoji:'', inicio:'', meio:'', fim:'', paginas:[], resumo:''},
   regenHistoria: 0,
-  formato: null, email: ''
+  rodadasAjuste: 0,
+  formato: null, email: '', telefone: '',
+  endereco: {cep:'', logradouro:'', numero:'', complemento:'', bairro:'', cidade:'', estado:''}
 };
 
 var STEPS = [
@@ -364,9 +420,8 @@ var ROTEIROS = [
 ];
 
 var FORMATOS = [
-  {id:'digital',ec:'\u{1F4F1}',t:'Digital',d:'PDF por email. Imediato!',p:49,dest:false},
-  {id:'impresso',ec:'\u{1F4D7}',t:'Impresso',d:'Livro fisico entregue em casa',p:99,dest:true},
-  {id:'capa_dura',ec:'\u{1F4D8}',t:'Capa Dura',d:'Encadernacao especial, para sempre!',p:179,dest:false}
+  {id:'digital',ec:'\u{1F4F1}',t:'Digital',d:'PDF por email. Pronto em minutos!',p:79,dest:false,paginas:6},
+  {id:'impresso',ec:'\u{1F4D7}',t:'Impresso',d:'Livro fisico com 12 cenas. Entregue em casa!',p:159,dest:true,paginas:12}
 ];
 
 var PG_EC = {
@@ -462,7 +517,7 @@ function renderPers(){
     var fotoHtml = p.fotoUrl
       ? '<img class="pers-foto" src="'+p.fotoUrl+'"/>'
       : '<div class="pers-placeholder" onclick="tFoto('+p.id+')">\u{1F4F8}</div>';
-    var removeBtn = i > 0 ? '<button class="pers-remove" onclick="remP('+p.id+'">\u2715</button>' : '';
+    var removeBtn = i > 0 ? '<button class="pers-remove" onclick="remP('+p.id+')">\u2715</button>' : '';
     var labelNome = i===0 ? 'Nome da crianca (protagonista)' : 'Nome do personagem';
     var placeholderNome = i===0 ? 'Ex: Sofia, Miguel...' : 'Ex: Vovo Maria...';
     var opcoesSelect = '';
@@ -486,13 +541,109 @@ function renderPers(){
   if(btn) btn.style.display = ST.personagens.length >= 8 ? 'none' : 'flex';
 }
 
-function tFoto(id){ var el=document.getElementById('fi-'+id); if(el)el.click(); }
+// Exibe guia de foto antes de abrir o seletor
+function tFoto(id){
+  var p=ST.personagens.filter(function(x){return x.id===id;})[0];
+  if(p && p.fotoUrl){ abrirSeletorFoto(id); return; }
+  var old=document.getElementById('guiaFotoModal'); if(old) old.remove();
+  var modal=document.createElement('div');
+  modal.id='guiaFotoModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:600;display:flex;align-items:center;justify-content:center;padding:16px';
+  var html='';
+  html+='<div style="background:white;border-radius:24px;padding:28px 24px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3)">';
+  html+='<div style="font-size:1.15rem;font-weight:800;color:#0C447C;margin-bottom:6px">📸 Como tirar a melhor foto</div>';
+  html+='<p style="font-size:.82rem;color:#888;margin-bottom:16px">Para o avatar ficar parecido de verdade, a foto precisa ser boa!</p>';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px">';
+  html+='<div style="background:#F0FDF4;border:2px solid #22C55E;border-radius:14px;padding:12px;text-align:center">';
+  html+='<div style="font-size:2rem;margin-bottom:6px">😊</div>';
+  html+='<div style="font-size:.78rem;font-weight:800;color:#15803D;margin-bottom:6px">✅ FOTO BOA</div>';
+  html+='<div style="font-size:.72rem;color:#166534;line-height:1.5;text-align:left">';
+  html+='• Rosto de frente<br>• Olhos bem abertos<br>• Boa iluminação<br>• Sem óculos escuros<br>• Fundo simples';
+  html+='</div></div>';
+  html+='<div style="background:#FFF1F2;border:2px solid #F43F5E;border-radius:14px;padding:12px;text-align:center">';
+  html+='<div style="font-size:2rem;margin-bottom:6px">😎</div>';
+  html+='<div style="font-size:.78rem;font-weight:800;color:#BE123C;margin-bottom:6px">❌ EVITE</div>';
+  html+='<div style="font-size:.72rem;color:#9F1239;line-height:1.5;text-align:left">';
+  html+='• Óculos escuros<br>• Rosto de lado<br>• Foto escura<br>• Rosto muito pequeno<br>• Chapéu na testa';
+  html+='</div></div>';
+  html+='</div>';
+  html+='<div style="background:#FFF7ED;border:1.5px solid #F97316;border-radius:12px;padding:10px 14px;margin-bottom:18px;font-size:.78rem;color:#9A3412">';
+  html+='💡 <strong>Dica:</strong> Selfie com boa luz natural, rosto de frente e sem óculos escuros!';
+  html+='</div>';
+  html+='<div style="display:flex;gap:10px">';
+  html+='<button id="guiaBtnVoltar" style="flex:1;padding:11px;border-radius:50px;background:white;border:2px solid #ddd;font-weight:700;cursor:pointer;font-size:.85rem">Voltar</button>';
+  html+='<button id="guiaBtnOk" style="flex:2;padding:11px;border-radius:50px;background:linear-gradient(135deg,#0C447C,#7F77DD);border:none;color:white;font-weight:800;cursor:pointer;font-size:.85rem">Entendi, escolher foto 📸</button>';
+  html+='</div></div>';
+  modal.innerHTML=html;
+  document.body.appendChild(modal);
+  document.getElementById('guiaBtnVoltar').onclick=function(){ modal.remove(); };
+  document.getElementById('guiaBtnOk').onclick=function(){ modal.remove(); abrirSeletorFoto(id); };
+}
+
+function abrirSeletorFoto(id){
+  var el=document.getElementById('fi-'+id); if(el)el.click();
+}
+
 function onFoto(id,inp){
   var f=inp.files[0]; if(!f)return;
   var p=ST.personagens.filter(function(x){return x.id===id;})[0];
   if(p){ p.fotoUrl=URL.createObjectURL(f); p.avatarUrl=null; p.avatarErro=false; }
+  verificarQualidadeFoto(f,id);
   renderPers();
 }
+
+async function verificarQualidadeFoto(file,id){
+  return new Promise(function(resolve){
+    var img=new Image();
+    img.onload=function(){
+      var w=img.width, h=img.height;
+      var problemas=[];
+      if(w<100||h<100) problemas.push('Foto muito pequena — use uma foto maior');
+      if(w/h>3||h/w>4) problemas.push('Proporção estranha — prefira foto de rosto');
+      try{
+        var canvas=document.createElement('canvas');
+        canvas.width=Math.min(w,200); canvas.height=Math.min(h,200);
+        var ctx=canvas.getContext('2d');
+        ctx.drawImage(img,0,0,canvas.width,canvas.height);
+        var data=ctx.getImageData(0,0,canvas.width,canvas.height).data;
+        var total=0, px=data.length/4;
+        for(var i=0;i<data.length;i+=4) total+=(data[i]*0.299+data[i+1]*0.587+data[i+2]*0.114);
+        var brilho=total/px;
+        if(brilho<40) problemas.push('Foto muito escura — tente com mais luz');
+        else if(brilho>230) problemas.push('Foto muito clara/estourada');
+      }catch(e){}
+      if(problemas.length>0) mostrarAvisoFoto(problemas,id);
+      resolve();
+    };
+    img.onerror=function(){ resolve(); };
+    img.src=URL.createObjectURL(file);
+  });
+}
+
+function mostrarAvisoFoto(problemas,id){
+  var old=document.getElementById('avisoFotoModal'); if(old) old.remove();
+  var modal=document.createElement('div');
+  modal.id='avisoFotoModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:600;display:flex;align-items:center;justify-content:center;padding:16px';
+  var html='';
+  html+='<div style="background:white;border-radius:24px;padding:28px 24px;max-width:380px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.25)">';
+  html+='<div style="font-size:2rem;text-align:center;margin-bottom:10px">⚠️</div>';
+  html+='<div style="font-size:1.1rem;font-weight:800;color:#B45309;text-align:center;margin-bottom:8px">Foto pode prejudicar o resultado</div>';
+  html+='<p style="font-size:.82rem;color:#888;text-align:center;margin-bottom:14px">Detectamos os seguintes problemas:</p>';
+  html+='<div style="background:#FFF7ED;border:1.5px solid #F97316;border-radius:12px;padding:12px 16px;margin-bottom:18px">';
+  for(var i=0;i<problemas.length;i++) html+='<div style="font-size:.8rem;color:#9A3412;margin-bottom:4px">⚠️ '+problemas[i]+'</div>';
+  html+='</div>';
+  html+='<p style="font-size:.78rem;color:#888;text-align:center;margin-bottom:16px">Recomendamos trocar a foto para melhor resultado.</p>';
+  html+='<div style="display:flex;gap:10px">';
+  html+='<button id="avisoBtnTrocar" style="flex:1;padding:10px;border-radius:50px;background:linear-gradient(135deg,#0C447C,#7F77DD);border:none;color:white;font-weight:800;cursor:pointer;font-size:.8rem">Trocar foto 📸</button>';
+  html+='<button id="avisoBtnManter" style="flex:1;padding:10px;border-radius:50px;background:white;border:2px solid #ddd;font-weight:700;cursor:pointer;font-size:.8rem">Manter assim</button>';
+  html+='</div></div>';
+  modal.innerHTML=html;
+  document.body.appendChild(modal);
+  document.getElementById('avisoBtnTrocar').onclick=function(){ modal.remove(); abrirSeletorFoto(id); };
+  document.getElementById('avisoBtnManter').onclick=function(){ modal.remove(); };
+}
+
 function tentarAdd(){
   if(ST.personagens.length>=4){
     var mo=document.createElement('div');
@@ -650,33 +801,78 @@ function buildPrompt(est, proto, outros, tema, listaP, instrP){
     terror: 'Terror infantil divertido. Sustos genuinos, atmosfera dark, final que mistura alivio e risada. Pode ter vilao assustador.'
   }[roteiro] || 'Historia emocionante com coragem e amor.';
 
+  // Vocabulário adequado por idade
+  var vocabInstrucao = '';
+  var idadeNum = parseInt(idade) || 6;
+  if(idadeNum <= 5){
+    vocabInstrucao = 'LINGUAGEM: A crianca tem '+idade+' anos. Use palavras MUITO simples, frases curtissimas (max 8 palavras cada), vocabulario do dia a dia. Nada de "suspirou", "pairou", "trêmula", "murmurou". Use: falou, gritou, correu, pulou, chorou, riu, abraçou. Cada frase deve ser entendida por uma crianca pequena.';
+  } else if(idadeNum <= 7){
+    vocabInstrucao = 'LINGUAGEM: A crianca tem '+idade+' anos. Use linguagem simples e direta. Frases de no maximo 15 palavras. Evite vocabulario rebuscado. Prefira palavras concretas e acoes visiveis. Tudo que acontece na historia deve ser facil de imaginar.';
+  } else if(idadeNum <= 10){
+    vocabInstrucao = 'LINGUAGEM: A crianca tem '+idade+' anos. Pode usar linguagem um pouco mais rica, mas sempre clara e acessivel. Frases variadas, algumas mais longas. Pode ter palavras novas desde que o contexto explique o significado. Historia envolvente e facil de seguir.';
+  } else {
+    vocabInstrucao = 'LINGUAGEM: O leitor tem '+idade+' anos. Pode usar linguagem mais elaborada, metaforas simples e vocabulario variado. Historia com profundidade emocional real. Frases ricas mas sem exagero literario.';
+  }
+
   if(est==='visual'){
-    p = 'Voce e o melhor autor brasileiro de livros infantis ilustrados. Cada pagina que voce escreve e uma cena cinematografica que faz criancas pedirem "le de novo!"\n\n';
+    p = 'Voce e o melhor autor brasileiro de livros infantis ilustrados. Cada pagina e uma cena que faz criancas pedirem "le de novo!"\n\n';
+    p += vocabInstrucao + '\n\n';
     p += 'DADOS DA HISTORIA:\n';
     p += 'Protagonista: ' + proto.nome + ', ' + idade + ' anos\n';
-    p += 'Personagens (TODOS devem aparecer ativamente):\n' + listaP;
+    p += 'Personagens (TODOS devem aparecer ativamente na historia):\n' + listaP;
     p += 'Presente de: ' + quem + '\n';
     p += 'Detalhes pessoais: ' + detalhe + '\n';
     p += 'Tema: ' + tema + '\n';
     p += 'Tom: ' + tomRoteiro + '\n\n';
     p += instrP + '\n\n';
-    p += 'COMO ESCREVER CADA PAGINA (OBRIGATORIO - minimo 3 frases ricas por pagina):\n';
-    p += 'Frase 1: Cena VIVA com detalhe sensorial unico (cor, som, cheiro, textura, temperatura)\n';
-    p += 'Frase 2: Onomatopeia + acao (SPLASH! CRACK! WHOOSH! GRRR! TUM-TUM!) criativo e especifico\n';
-    p += 'Frase 3: Fala direta entre aspas OU reacao emocional intensa do personagem\n';
-    p += 'Use o nome dos personagens em quase todas as paginas. PROIBIDO textos genericos.\n\n';
-    p += 'ARCO DAS 6 PAGINAS:\n';
-    p += 'Pag 1: Cena inicial VIVA - protagonista em acao unica, detalhe que mostra personalidade\n';
-    p += 'Pag 2: Mudanca DRAMATICA - surpresa, barulho, descoberta inesperada e especifica\n';
-    p += 'Pag 3: Desafio REAL com obstaculo concreto, emocao verdadeira\n';
-    p += 'Pag 4: Perigo maximo - tensao alta, o pior momento da historia\n';
-    p += 'Pag 5: Virada corajosa - protagonista age de forma unica e inesperada\n';
-    p += 'Pag 6: Resolucao EMOCIONANTE com frase final que o leitor vai querer repetir\n\n';
+    p += 'COMO ESCREVER CADA PAGINA (OBRIGATORIO):\n';
+    p += 'Cada pagina deve ter 3 blocos de texto separados por linha em branco, cada bloco com 2 a 3 frases.\n';
+    p += 'Bloco 1: Cena VIVA com detalhe sensorial (cor, som, cheiro, textura, temperatura). Minimo 2 frases.\n';
+    p += 'Bloco 2: Onomatopeia + acao dinamica (SPLASH! CRACK! WHOOSH! GRRR! TIC-TAC! BOOM!). Minimo 2 frases.\n';
+    p += 'Bloco 3: Fala direta entre aspas + reacao emocional do personagem. Minimo 2 frases.\n';
+    p += 'PROIBIDO: texto de apenas 1 frase por bloco. PROIBIDO: paginas com menos de 6 frases no total.\n';
+    p += 'REGRA DE OURO DOS PERSONAGENS:\n';
+    p += '1. O PROTAGONISTA ('+proto.nome+') é o herói — aparece em TODAS as páginas, sempre central.\n';
+    p += '2. PERSONAGENS REAIS CADASTRADOS (familiares, amigos com foto): aparecem ativamente em pelo menos 50% das páginas, com falas e ações relevantes. São pessoas reais que a criança conhece.\n';
+    p += '3. PERSONAGENS INVENTADOS PELA IA: PROIBIDO inventar personagens novos que não estão na lista. Se a história precisa de conflito, use os personagens cadastrados ou elementos da natureza/ambiente.\n';
+    p += 'Use o nome EXATO de cada personagem como cadastrado. Nunca substitua por apelido diferente.\n\n';
+    p += 'ARCO DAS 6 PAGINAS (comeco, meio e fim claros):\n';
+    p += 'Pag 1: Apresentacao - personagens em acao, mundo da historia estabelecido, detalhe que mostra personalidade\n';
+    p += 'Pag 2: Mudanca - algo inesperado acontece, barulho ou descoberta que muda tudo\n';
+    p += 'Pag 3: Desafio - obstaculo real, personagens tentam resolver juntos, emocao verdadeira\n';
+    p += 'Pag 4: Pior momento - tensao maxima, parece impossivel, o maior susto ou tristeza\n';
+    p += 'Pag 5: Virada - protagonista age de forma corajosa e inesperada, todos ajudam\n';
+    p += 'Pag 6: Resolucao - celebracao, emocao compartilhada, frase final que fica na memoria\n\n';
+    // Para impresso, pede 12 páginas
+    if(ST.formato==='impresso'){
+      p += 'Pag 7: Descoberta 2 - novo elemento que aprofunda a aventura\n';
+      p += 'Pag 8: Desafio 2 - obstáculo maior, tensão aumenta\n';
+      p += 'Pag 9: Ajuda inesperada - personagem secundário salva a situação\n';
+      p += 'Pag 10: Revelação - protagonista descobre algo sobre si mesmo\n';
+      p += 'Pag 11: Clímax - momento mais emocionante, tudo se resolve\n';
+      p += 'Pag 12: Epílogo - cena final de amor, celebração e gratidão\n\n';
+    }
     p += 'Responda APENAS com este JSON (sem markdown, sem explicacoes):\n';
-    p += '{"titulo":"Titulo memoravel e especifico","emoji":"emoji perfeito","paginas":[{"num":1,"titulo":"Titulo evocativo","texto":"Frase 1 sensorial.\\n\\nFrase 2 com onomatopeia.\\n\\nFrase 3 emocional."},{"num":2,"titulo":"Titulo","texto":"Frase 1.\\n\\nFrase 2.\\n\\nFrase 3."},{"num":3,"titulo":"Titulo","texto":"Frase 1.\\n\\nFrase 2.\\n\\nFrase 3."},{"num":4,"titulo":"Titulo","texto":"Frase 1.\\n\\nFrase 2.\\n\\nFrase 3."},{"num":5,"titulo":"Titulo","texto":"Frase 1.\\n\\nFrase 2.\\n\\nFrase 3."},{"num":6,"titulo":"Titulo","texto":"Frase 1.\\n\\nFrase 2.\\n\\nFrase 3."}]}';
+    p += '{"titulo":"Titulo memoravel e especifico","emoji":"emoji perfeito","paginas":[';
+    p += '{"num":1,"titulo":"Titulo evocativo","texto":"O sol dourado entrava pela janela enquanto [NOME] pulou da cama com um grito de alegria. O cheiro de pao quentinho vinha da cozinha e deixava o ar mais gostoso.\\n\\nPOF! A mochila explodiu de tanta coisa boa. [NOME] correu pelo corredor segurando tudo com as duas maos cheias de animacao.\\n\\n\\"Hoje vai ser o melhor dia da minha vida!\\" gritou [NOME] com os olhos brilhando. O coracao batia tao forte que parecia um tambor de festa."},';
+    p += '{"num":2,"titulo":"Titulo evocativo da cena 2","texto":"Bloco 1 com 2 frases sensoriais especificas sobre o ambiente: cor, cheiro, textura ou temperatura que o personagem sente neste momento. Segunda frase aprofundando o que acontece ao redor.\\n\\nOnomatopeia! Acao dinamica do personagem com energia e movimento. Segunda frase mostrando a consequencia imediata dessa acao.\\n\\n\\"Fala direta e expressiva de um personagem!\\" Reacao emocional clara e especifica de como o personagem se sentiu. Segunda frase mostrando o que aconteceu em seguida."},';
+    p += '{"num":3,"titulo":"Titulo evocativo da cena 3","texto":"Descricao viva do ambiente com detalhe sensorial especifico de cor, som ou textura. Segunda frase aprofundando a atmosfera e o que os personagens percebem ao redor.\\n\\nOnomatopeia! Acao intensa com consequencias claras para os personagens. Segunda frase mostrando como a situacao ficou mais complicada ou emocionante.\\n\\n\\"Fala carregada de emocao!\\" Reacao intensa e verdadeira de um dos personagens. Segunda frase revelando o impacto emocional da cena em todos."},';
+    p += '{"num":4,"titulo":"Titulo evocativo da cena 4","texto":"Tensao maxima com detalhe sensorial que mostra o perigo ou o desafio em seu pior momento. Segunda frase elevando a sensacao de urgencia e dificuldade.\\n\\nOnomatopeia! Acao critica no ponto mais dificil da historia. Segunda frase mostrando o quanto a situacao parece impossivel de resolver.\\n\\n\\"Fala que revela vulnerabilidade ou determinacao!\\" Reacao que mostra o que o personagem sente por dentro. Segunda frase revelando a decisao corajosa que o protagonista toma."},';
+    p += '{"num":5,"titulo":"Titulo evocativo da cena 5","texto":"Virada marcada por detalhe sensorial que sinaliza a mudanca. Segunda frase mostrando o momento exato em que tudo comeca a se transformar.\\n\\nOnomatopeia! Acao heroica ou criativa do protagonista que resolve o problema de forma unica. Segunda frase mostrando como os outros personagens reagem com surpresa ou alegria.\\n\\n\\"Fala de triunfo ou emocao compartilhada!\\" Reacao de alivio, orgulho ou amor entre os personagens. Segunda frase consolidando a conquista de todos juntos."},';
+    p += '{"num":6,"titulo":"Titulo evocativo da cena 6","texto":"Cena final com detalhe sensorial caloroso e especifico que resume o tom da historia. Segunda frase mostrando os personagens em paz e harmonia apos tudo que viveram juntos.\\n\\nOnomatopeia! Acao final de celebracao ou carinho entre os personagens. Segunda frase completando o momento de forma memoravel e especial.\\n\\n\\"Fala final inesquecivel que fica no coracao!\\" Reacao de amor, gratidao ou alegria pura compartilhada por todos. Segunda frase fechando a historia com muito calor no coracao."}';
+    if(ST.formato==='impresso'){
+      p += ',{"num":7,"titulo":"Titulo cena 7","texto":"Formato identico as paginas anteriores com 3 blocos."}';
+      p += ',{"num":8,"titulo":"Titulo cena 8","texto":"Formato identico."}';
+      p += ',{"num":9,"titulo":"Titulo cena 9","texto":"Formato identico."}';
+      p += ',{"num":10,"titulo":"Titulo cena 10","texto":"Formato identico."}';
+      p += ',{"num":11,"titulo":"Titulo cena 11","texto":"Formato identico."}';
+      p += ',{"num":12,"titulo":"Titulo cena 12 - pagina final","texto":"Formato identico, cena de encerramento emocionante."}';
+    }
+    p += ']}';
   } else {
-    p = 'Voce e um dos maiores autores brasileiros de literatura infantil. Voce conhece o segredo das historias que ficam para sempre: personagens reais, emocoes verdadeiras, e um fio narrativo que prende do inicio ao fim.\n\n';
-    p += 'Esta historia sera impressa e dada de presente. Ela precisa ser boa o suficiente para a pessoa guardar pelo resto da vida.\n\n';
+    p = 'Voce e um dos maiores autores brasileiros de literatura infantil. Voce conhece o segredo das historias que ficam para sempre: personagens reais, emocoes verdadeiras, fio narrativo que prende do inicio ao fim.\n\n';
+    p += 'Esta historia sera impressa e dada de presente. Ela precisa ser boa o suficiente para guardar pelo resto da vida.\n\n';
+    p += vocabInstrucao + '\n\n';
     p += 'DADOS DA HISTORIA:\n';
     p += 'Protagonista: ' + proto.nome + ', ' + idade + ' anos\n';
     p += 'Todos os personagens (TODOS devem ter cenas e falas relevantes):\n' + listaP;
@@ -686,35 +882,35 @@ function buildPrompt(est, proto, outros, tema, listaP, instrP){
     p += 'Tom e genero: ' + tomRoteiro + '\n\n';
     p += instrP + '\n\n';
     p += 'COMO CONSTRUIR A HISTORIA:\n\n';
-    p += 'INICIO - Os primeiros 6 paragrafos precisam:\n';
-    p += '1. Abrir com uma cena viva e especifica - nao "era uma vez", mas algo que acontece AGORA com detalhe sensorial\n';
-    p += '2. Mostrar quem e ' + proto.nome + ' atraves de uma acao ou pensamento tipico dele/dela, nao de descricao\n';
-    p += '3. Trazer os outros personagens de forma organica, com uma fala ou gesto que mostra quem sao\n';
-    p += '4. Estabelecer o mundo da historia com detalhes que fazem o leitor VER o lugar\n';
-    p += '5. Introduzir o problema, desafio ou situacao central de forma que crie urgencia\n';
-    p += '6. Terminar o inicio com ' + proto.nome + ' tomando uma decisao que vai mudar tudo\n\n';
-    p += 'MEIO - Os proximos 6 paragrafos precisam:\n';
-    p += '1. Mostrar ' + proto.nome + ' tentando resolver o problema - e falhando de forma interessante\n';
-    p += '2. Dar a CADA personagem secundario um momento proprio: uma fala, uma acao, uma reacao que importa\n';
-    p += '3. Elevar a tensao - as coisas ficam mais dificeis, o risco aumenta\n';
-    p += '4. Criar um momento de duvida real: ' + proto.nome + ' considera desistir ou muda sua visao\n';
-    p += '5. Ponto de virada emocional: algo que ' + proto.nome + ' descobre sobre si mesmo ou sobre os outros\n';
-    p += '6. O climax se aproxima - escreva com frases mais curtas, ritmo mais acelerado\n\n';
-    p += 'FIM - Os ultimos 5 paragrafos precisam:\n';
-    p += '1. A acao final de ' + proto.nome + ' - corajosa, criativa, unica para esse personagem\n';
-    p += '2. Mostrar como cada personagem e afetado pela resolucao - cada um tem sua reacao\n';
-    p += '3. O momento de celebracao ou emocao compartilhada entre todos\n';
-    p += '4. Uma cena final que mostra (sem explicar) o que ' + proto.nome + ' aprendeu - pode ser um gesto, um olhar, uma fala\n';
-    p += '5. Fechamento poetico que menciona ' + quem + ' e deixa o leitor com calor no coracao\n\n';
+    p += 'INICIO (6 paragrafos ricos) - deve:\n';
+    p += '1. Abrir com cena viva e especifica - nao "era uma vez", mas algo que acontece AGORA com detalhe sensorial\n';
+    p += '2. Mostrar quem e ' + proto.nome + ' atraves de acao ou pensamento tipico, nao descricao\n';
+    p += '3. Trazer os outros personagens de forma organica, com fala ou gesto que mostra quem sao\n';
+    p += '4. Estabelecer o mundo com detalhes que fazem o leitor VER o lugar\n';
+    p += '5. Introduzir o problema central de forma que crie urgencia\n';
+    p += '6. Terminar com ' + proto.nome + ' tomando decisao que vai mudar tudo\n\n';
+    p += 'MEIO (6 paragrafos ricos) - deve:\n';
+    p += '1. Mostrar ' + proto.nome + ' tentando resolver o problema e falhando de forma interessante\n';
+    p += '2. Dar a CADA personagem CADASTRADO (não inventado) momento proprio: fala, acao, reacao que importa. PROIBIDO inventar personagens novos que nao estao na lista fornecida.\n';
+    p += '3. Elevar a tensao - coisas ficam mais dificeis, risco aumenta\n';
+    p += '4. Criar momento de duvida real: ' + proto.nome + ' considera desistir ou muda sua visao\n';
+    p += '5. Ponto de virada emocional: ' + proto.nome + ' descobre algo sobre si ou sobre os outros\n';
+    p += '6. Climax se aproxima - frases mais curtas, ritmo acelerado\n\n';
+    p += 'FIM (5 paragrafos ricos) - deve:\n';
+    p += '1. Acao final de ' + proto.nome + ' - corajosa, criativa, unica para esse personagem\n';
+    p += '2. Mostrar como cada personagem e afetado - cada um tem sua reacao propria\n';
+    p += '3. Momento de celebracao ou emocao compartilhada entre todos\n';
+    p += '4. Cena final que mostra (sem explicar) o que ' + proto.nome + ' aprendeu\n';
+    p += '5. Fechamento que menciona ' + quem + ' e deixa o leitor com calor no coracao\n\n';
     p += 'REGRAS DE OURO:\n';
-    p += '- Cada paragrafo tem pelo menos uma fala entre aspas - personagens reais falam\n';
-    p += '- Pelo menos 3 momentos com detalhes sensoriais especificos (cheiro, textura, som, cor)\n';
-    p += '- Varie o ritmo: paragrafos longos para momentos contemplativas, frases curtas para tensao\n';
-    p += '- Use o nome ' + proto.nome + ' pelo menos 15 vezes na historia inteira\n';
+    p += '- Cada paragrafo tem pelo menos uma fala entre aspas\n';
+    p += '- Pelo menos 4 momentos com detalhes sensoriais especificos\n';
+    p += '- Varie o ritmo: paragrafos longos para contemplacao, frases curtas para tensao\n';
+    p += '- Use o nome ' + proto.nome + ' pelo menos 15 vezes\n';
     p += '- Nunca explique a moral. Mostre atraves das acoes.\n';
     p += '- Separe todos os paragrafos com linha em branco\n\n';
     p += 'Responda APENAS com este JSON (sem markdown, sem texto fora do JSON):\n';
-    p += '{"titulo":"Titulo que a crianca vai querer repetir - memoravel e especifico para esta historia","emoji":"emoji perfeito para o tom","inicio":"6 paragrafos ricos separados por linha em branco","meio":"6 paragrafos ricos separados por linha em branco","fim":"5 paragrafos ricos separados por linha em branco"}';
+    p += '{"titulo":"Titulo memoravel e especifico para esta historia","emoji":"emoji perfeito para o tom","inicio":"6 paragrafos ricos separados por linha em branco","meio":"6 paragrafos ricos separados por linha em branco","fim":"5 paragrafos ricos separados por linha em branco"}';
   }
   return p;
 }
@@ -735,23 +931,50 @@ async function gerarHistoria(){
     var ppl=PAPEIS.filter(function(r){return r.v===pp.papel;})[0].l;
     listaP += '- '+pp.nome+' ('+ppl+')\n';
   }
-  var instrP = ST.personagens.length > 1
-    ? 'MUITO IMPORTANTE: TODOS os personagens listados DEVEM aparecer e participar ativamente. Cada um deve ter pelo menos uma cena ou fala relevante. Nao omita nenhum.'
-    : '';
+  // Monta instrução reforçando nomes EXATOS
+  var nomesExatos = ST.personagens.map(function(p){ return '"'+p.nome+'"'; }).join(', ');
+  var instrP = 'REGRA ABSOLUTA DE NOMES: use EXATAMENTE os nomes cadastrados: '+nomesExatos+'. '
+    + 'PROIBIDO inventar nomes proprios, sobrenomes, apelidos ou variacoes. '
+    + 'Se o nome for "vovo", use "vovo". Se for "Papai", use "Papai". Nunca substitua por outro nome. '
+    + (ST.personagens.length > 1
+      ? 'TODOS os personagens listados DEVEM aparecer e participar ativamente. Cada um deve ter pelo menos uma cena ou fala relevante. Nao omita nenhum.'
+      : '');
 
   var prompt = buildPrompt(est, proto, '', tema, listaP, instrP);
 
+  // Tenta acordar o Render antes da chamada principal (evita cold start)
+  try{ await fetch('https://squishbook-backend-v2.onrender.com/',{method:'GET'}); }catch(e){}
+
+  var resHist=null, dataHist=null;
+  for(var tentHist=0; tentHist<3; tentHist++){
+    try{
+      resHist=await fetch('https://squishbook-backend-v2.onrender.com/api/historia',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:6000,messages:[{role:'user',content:prompt}]})
+      });
+      dataHist=await resHist.json();
+      if(resHist.ok) break; // sucesso
+      console.error('[Squishbook] /api/historia erro '+resHist.status+':', JSON.stringify(dataHist).substring(0,300));
+      if(tentHist<2){ await new Promise(function(r){setTimeout(r,3000);}); } // aguarda 3s antes do retry
+    }catch(e){
+      if(tentHist<2){ await new Promise(function(r){setTimeout(r,3000);}); }
+    }
+  }
   try{
-    var res=await fetch('https://squishbook-backend.onrender.com/api/historia',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:4000,messages:[{role:'user',content:prompt}]})
-    });
-    var data=await res.json();
+    var res=resHist, data=dataHist;
+    if(!res||!res.ok) throw new Error('Falha após 3 tentativas: '+(res?res.status:'sem resposta'));
     clearInterval(iv);
     if(data.content&&data.content[0]&&data.content[0].text){
       var raw=data.content[0].text.trim().replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
       ST.historia=JSON.parse(raw);
+      // Gera resumo da historia para preview pre-pagamento (2-3 frases)
+      if(!ST.historia.resumo){
+        var textoBase=ST.estiloFinal==='visual'
+          ?(ST.historia.paginas&&ST.historia.paginas[0]?ST.historia.paginas[0].texto:'')
+          :(ST.historia.inicio?ST.historia.inicio.split('\n\n')[0]:'');
+        ST.historia.resumo=ST.historia.titulo+'. '+textoBase.split('.').slice(0,2).join('.')+'.';
+      }
       ST.step=5; render();
     } else throw new Error('sem resposta');
   }catch(e){
@@ -759,13 +982,17 @@ async function gerarHistoria(){
     var n=proto.nome;
     var outro=ST.personagens.length>1?ST.personagens[1].nome:(ST.respostas.quem_da||'alguem especial');
     if(est==='visual'){
-      ST.historia={titulo:n+' e a Grande Descoberta',emoji:'\u{1F31F}',paginas:[
-        {num:1,titulo:'Era uma vez...',texto:n+' acordou com o sol brilhando.\n\nHoje seria um dia muito especial!'},
-        {num:2,titulo:'A aventura comeca',texto:'O jardim estava cheio de surpresas.\n\n'+n+' correu animado para explorar!'},
-        {num:3,titulo:'Uma surpresa!',texto:'Atras da arvore grande, havia algo brilhando.\n\n'+n+' prendeu a respiracao de emocao.'},
-        {num:4,titulo:'Que maravilha!',texto:'Era uma borboleta colorida gigante!\n\nEla pousou no braco de '+n+' com delicadeza.'},
-        {num:5,titulo:'Juntos!',texto:outro+' chegou correndo para ver tambem.\n\nJuntos riram e aplaudiram de felicidade!'},
-        {num:6,titulo:'Para sempre',texto:n+' guardou aquele momento no coracao.\n\nAlguns dias ficam na memoria para sempre.'}
+      // Mostra aviso de erro mas ainda continua com historia enriquecida
+      var errMsg=document.getElementById('loadTxt');
+      if(errMsg) errMsg.textContent='Gerando historia alternativa...';
+      var rot2=ST.roteiro||'aventura';
+      ST.historia={titulo:n+' e a Grande '+({aventura:'Aventura',amizade:'Amizade',familia:'Familia',magia:'Magia',animal:'Descoberta',sonho:'Conquista',terror:'Susto'}[rot2]||'Descoberta'),emoji:({aventura:'\u{1F31F}',amizade:'\u{1F91D}',familia:'\u{2764}\uFE0F',magia:'\u2728',animal:'\u{1F43E}',sonho:'\u{1F308}',terror:'\u{1F383}'}[rot2]||'\u{1F31F}'),paginas:[
+        {num:1,titulo:'Uma manha diferente',texto:'O sol dourado entrou pela janela e acordou '+n+' com um calor gostoso no rosto. O cheiro de panquecas quentinhas vinha da cozinha, fazendo a barriga roncar de alegria.\n\nTIC-TAC! O relogio marcava a hora H. '+n+' saltou da cama de um pulo e correu pelo corredor com os pes descalcos no chao frio.\n\n"Hoje e um dia especial!", sussurrou '+n+' para si mesmo com os olhos brilhando. O coracao batia forte de tanta animacao e vontade de descobrir o que viria.'},
+        {num:2,titulo:'A descoberta',texto:outro+' esperava sorrindo com algo escondido nas maos. O ambiente estava cheio de detalhes novos que '+n+' nunca tinha notado antes, cada canto guardava uma surpresa colorida.\n\nWHOOSH! Algo voou pelos ares deixando um rastro brilhante. '+n+' correu animado apontando para o ceu com os dois bracos abertos.\n\n"Voce esta vendo o que eu estou vendo?", gritou '+n+' pulando de felicidade. '+outro+' riu e acenou com a cabeca, os olhos cheios de cumplicidade e amor.'},
+        {num:3,titulo:'O desafio',texto:'O caminho a frente estava cheio de pedras e galhos que balancavam com o vento. '+n+' sentia o coracao acelerar diante do obstaculo que parecia enorme e impossivel de superar.\n\nCRASH! Algo rolou pelo chao fazendo um barulhao que ecoou por todo lado. '+n+' parou no lugar com as maos na bochecha de tanto susto.\n\n"Como a gente vai passar por ali?", perguntou '+n+' com a voz tremula. '+outro+' segurou a mao de '+n+' com forca e sorriu: "Juntos a gente consegue qualquer coisa!".'},
+        {num:4,titulo:'O pior momento',texto:'A chuva comecou a cair forte e o vento assobiava entre as arvores fazendo um som assustador. '+n+' sentiu frio na barriga e vontade de voltar para casa quentinha.\n\nBOOM! Um trovao enorme sacudiu tudo ao redor. '+n+' se escondeu atras de '+outro+' tremendo de medo e molhado ate os ossos.\n\n"Eu quero desistir!", choramingou '+n+' segurando forte na mao de '+outro+'. '+outro+' abraçou '+n+' bem apertado: "Eu sei que voce e mais corajoso do que imagina".'},
+        {num:5,titulo:'A virada',texto:'Foi entao que '+n+' viu: um caminho secreto escondido entre as flores brilhando com luz propria. O coraçao deu um salto de esperança e os olhos brilharam como estrelas.\n\nSPLASH! '+n+' pisou numa poça e descobriu que o caminho levava exatamente onde precisavam chegar. '+outro+' ficou de boca aberta de tanta surpresa e orgulho.\n\n"Eu encontrei!", gritou '+n+' com os bracos erguidos para o alto. '+outro+' correu e abraçou '+n+' bem forte: "Sabia que voce conseguiria, meu heroi!".'},
+        {num:6,titulo:'Para sempre no coracao',texto:'O sol voltou a brilhar e pintou o ceu de laranja e rosa como um quadro lindo. '+n+' e '+outro+' ficaram olhando juntos para aquela beleza que parecia feita especialmente para eles dois.\n\nMMMMM! Os dois suspiraram de alegria ao mesmo tempo e riram da coincidencia. O momento ficaria guardado no coracao de '+n+' para sempre, como um tesouro inestimavel.\n\n"Obrigado por estar comigo em tudo!", disse '+n+' com a voz cheia de amor. '+outro+' beijou a testa de '+n+' com carinho: "Para sempre juntos, para sempre amigos, para sempre familia".'}
       ]};
     } else {
       var ini = n+' tinha '+ST.idadeCrianca+' anos e naquele dia tudo era diferente.\n\n';
@@ -827,28 +1054,57 @@ function s5(c){
     historiaHtml+='</div>';
   }
 
+  // Gera resumo da historia para preview pre-pagamento
+  var resumoHtml='';
+  if(ST.historia.resumo){
+    resumoHtml='<div style="background:linear-gradient(135deg,rgba(55,138,221,.08),rgba(127,119,221,.08));border:1.5px solid var(--azul-cl);border-radius:16px;padding:18px 20px;margin-bottom:16px">'
+      +'<div style="font-size:.75rem;font-weight:800;color:var(--azul);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px">Resumo da historia</div>'
+      +'<div style="font-size:.93rem;color:var(--texto);line-height:1.75;font-style:italic">'+ST.historia.resumo+'</div>'
+      +'<div style="margin-top:12px;padding:10px 14px;background:rgba(255,255,255,.6);border-radius:10px;border:1px dashed var(--azul-cl)">'
+      +'<div style="font-size:.78rem;color:var(--texto-sec)">\uD83D\uDD12 A hist\u00f3ria completa, com todas as p\u00e1ginas ilustradas, ficar\u00e1 dispon\u00edvel ap\u00f3s o pagamento.</div>'
+      +'</div>'
+      +'</div>';
+  }
+
+  // Silhuetas bloqueadas dos personagens secundarios
+  var outrosHtml='';
+  if(ST.personagens.length>1){
+    outrosHtml='<div style="margin-top:12px;padding:14px 16px;background:rgba(0,0,0,.04);border-radius:12px;border:1.5px dashed var(--borda)">'
+      +'<div style="font-size:.78rem;font-weight:700;color:var(--texto-sec);margin-bottom:10px">\uD83D\uDC64 Demais personagens gerados ap\u00f3s o pagamento:</div>'
+      +'<div style="display:flex;gap:12px;flex-wrap:wrap">';
+    for(var oi=1;oi<ST.personagens.length;oi++){
+      var op=ST.personagens[oi];
+      var opl=PAPEIS.filter(function(r){return r.v===op.papel;})[0].l;
+      outrosHtml+='<div style="display:flex;flex-direction:column;align-items:center;gap:6px">'
+        +'<div style="width:70px;height:70px;border-radius:14px;background:linear-gradient(135deg,#ddd,#bbb);display:flex;align-items:center;justify-content:center;font-size:1.8rem;opacity:.4">\u{1F464}</div>'
+        +'<div style="font-size:.72rem;font-weight:700;color:var(--texto-sec)">'+op.nome+'</div>'
+        +'<div style="font-size:.65rem;color:var(--texto-sec);opacity:.7">'+opl+'</div>'
+        +'</div>';
+    }
+    outrosHtml+='</div></div>';
+  }
+
   c.innerHTML='<div class="slabel">Passo 5 de 6</div>'
-    +'<h2 class="stit">Revise e aprove</h2>'
-    +'<p class="sdesc">Confira os avatares e a historia. Se nao gostar, gere novamente!</p>'
+    +'<h2 class="stit">Seu Squishbook est\u00e1 quase pronto!</h2>'
+    +'<p class="sdesc">Veja como ficou o avatar de <strong>'+ST.personagens[0].nome+'</strong> e confira o resumo da hist\u00f3ria.</p>'
     +'<div class="regen-bar">'
     +'<div class="regen-info"><strong>'+regenLeft+'</strong> regeneracao'+(regenLeft!==1?'s':'')+' restante'+(regenLeft!==1?'s':'')+'<div class="tentativas-dots" style="margin-top:4px">'+dotsHtml+'</div></div>'
     +'<button class="regen-btn"'+regenDis+' onclick="regenerar()">\u{1F504} Gerar novamente</button>'
     +'</div>'
-    +'<div class="revisao-titulo">\u{1F3A8} Avatares dos personagens</div>'
+    +'<div class="revisao-titulo">\u2728 Avatar de '+ST.personagens[0].nome+'</div>'
     +'<div class="avatares-grid" id="avatarGrid"></div>'
-    +'<p style="font-size:.78rem;color:var(--texto-sec);margin-top:8px;text-align:center">\u{1F3A8} Avatares gerados com IA</p>'
+    +'<p style="font-size:.78rem;color:var(--texto-sec);margin-top:4px;text-align:center">Gerado especialmente a partir da foto</p>'
+    +outrosHtml
     +'<hr class="revisao-sep"/>'
-    +'<div class="revisao-titulo">\u{1F4D6} A historia</div>'
-    +'<div class="livro-preview '+est+'" style="margin-bottom:16px">'
-    +'<span class="lp-emoji">'+ST.historia.emoji+'</span>'
-    +'<div class="lp-titulo">'+ST.historia.titulo+'</div>'
-    +'<div class="lp-sub">Uma historia criada para '+ST.personagens[0].nome+' \u{1F499}</div>'
-    +'<span class="lp-badge '+est+'">'+estLabel+'</span>'
+    +'<div class="revisao-titulo">\u{1F4D6} '+ST.historia.titulo+'</div>'
+    +resumoHtml
+    +'<div style="background:linear-gradient(135deg,var(--azul-esc),var(--roxo-esc));border-radius:16px;padding:18px 20px;margin-bottom:16px;color:white;text-align:center">'
+    +'<div style="font-size:.85rem;font-weight:800;margin-bottom:6px">\uD83C\uDF81 Seu presente digital inclui:</div>'
+    +'<div style="font-size:.8rem;opacity:.9;line-height:1.8">\u2705 Historia completa com 6 p\u00e1ginas ilustradas<br/>\u2705 Todos os personagens em estilo chibi<br/>\u2705 Cenas com os personagens interagindo<br/>\u2705 PDF personalizado para baixar</div>'
     +'</div>'
-    +historiaHtml
     +'<div class="btn-row">'
     +'<button class="btn btn-secondary" onclick="voltar()">\u2190 Voltar</button>'
-    +'<button class="btn btn-primary" onclick="av5()">Aprovei! Continuar \u2192</button>'
+    +'<button class="btn btn-primary" onclick="av5()">Quero este livro! \u2192</button>'
     +'</div>';
 
   renderAvatarGrid();
@@ -856,33 +1112,28 @@ function s5(c){
 
 function renderAvatarGrid(){
   var g=document.getElementById('avatarGrid'); if(!g) return;
-  var html='';
-  for(var i=0;i<ST.personagens.length;i++){
-    var p=ST.personagens[i];
-    var papelLabel=PAPEIS.filter(function(r){return r.v===p.papel;})[0].l;
-    var conteudo;
-    if(p.avatarUrl){
-      conteudo='<img src="'+p.avatarUrl+'" style="width:100px;height:100px;border-radius:16px;object-fit:cover;box-shadow:0 4px 16px rgba(0,0,0,.12)"/>';
-    } else if(p.avatarErro){
-      conteudo=p.fotoUrl
-        ?'<img src="'+p.fotoUrl+'" style="width:100px;height:100px;border-radius:50%;object-fit:cover;border:2.5px solid var(--azul-cl)"/>'
-        :'<div style="width:100px;height:100px;border-radius:16px;background:var(--azul-pal);display:flex;align-items:center;justify-content:center;font-size:2.5rem">\u2728</div>';
-    } else {
-      conteudo='<div id="av-load-'+p.id+'" style="width:100px;height:100px;border-radius:16px;background:linear-gradient(135deg,var(--azul-pal),rgba(175,169,236,.2));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px">'
-        +'<div style="width:28px;height:28px;border:3px solid var(--azul-cl);border-top-color:var(--azul-esc);border-radius:50%;animation:spin .8s linear infinite"></div>'
-        +'<div style="font-size:.68rem;color:var(--texto-sec);font-weight:700">Gerando...</div>'
-        +'</div>';
-    }
-    html+='<div class="avatar-item">'+conteudo
-      +'<div class="avatar-nome">'+p.nome+'</div>'
-      +'<div class="avatar-papel">'+papelLabel+'</div>'
+  // Pre-pagamento: mostra APENAS o protagonista no grid
+  var proto=ST.personagens[0];
+  var papelLabel=PAPEIS.filter(function(r){return r.v===proto.papel;})[0].l;
+  var conteudo;
+  if(proto.avatarUrl){
+    conteudo='<img src="'+proto.avatarUrl+'" style="width:110px;height:110px;border-radius:18px;object-fit:cover;box-shadow:0 6px 24px rgba(55,138,221,.25)"/>';
+  } else if(proto.avatarErro){
+    conteudo=proto.fotoUrl
+      ?'<img src="'+proto.fotoUrl+'" style="width:110px;height:110px;border-radius:50%;object-fit:cover;border:2.5px solid var(--azul-cl)"/>'
+      :'<div style="width:110px;height:110px;border-radius:18px;background:var(--azul-pal);display:flex;align-items:center;justify-content:center;font-size:2.5rem">\u2728</div>';
+  } else {
+    conteudo='<div id="av-load-'+proto.id+'" style="width:110px;height:110px;border-radius:18px;background:linear-gradient(135deg,var(--azul-pal),rgba(175,169,236,.2));display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px">'
+      +'<div style="width:32px;height:32px;border:3px solid var(--azul-cl);border-top-color:var(--azul-esc);border-radius:50%;animation:spin .8s linear infinite"></div>'
+      +'<div style="font-size:.72rem;color:var(--texto-sec);font-weight:700">Criando avatar...</div>'
       +'</div>';
   }
-  g.innerHTML=html;
-  for(var i=0;i<ST.personagens.length;i++){
-    var p=ST.personagens[i];
-    if(!p.avatarUrl&&!p.avatarErro) gerarAvatarDalle(p);
-  }
+  g.innerHTML='<div class="avatar-item">'+conteudo
+    +'<div class="avatar-nome">'+proto.nome+'</div>'
+    +'<div class="avatar-papel">'+papelLabel+'</div>'
+    +'</div>';
+  // Gera apenas o avatar do protagonista pre-pagamento
+  if(!proto.avatarUrl&&!proto.avatarErro) gerarAvatarDalle(proto);
 }
 
 async function gerarAvatarDalle(p){
@@ -945,8 +1196,34 @@ async function gerarAvatarDalle(p){
   var ehPet = p.papel === 'pet';
 
   var descFisica = '';
-  if(p.papel === 'protagonista' && ST.idadeCrianca && ST.idadeCrianca <= 8){
-    descFisica = 'young child approximately '+ST.idadeCrianca+' years old, small and cute, ';
+  // Detecta se o personagem é adulto pelo papel ou pelo nome
+  var nomesAdultos = ['pai','papai','papa','mae','mamae','mama','tio','tia','vovo','vovô','vovó','avo','avô','avó','irmao','irmã','irma','primo','prima','amigo','amiga','padrinho','madrinha','professor','professora'];
+  var nomeAdulto = false;
+  if(p.nome){
+    var nomeLower = p.nome.toLowerCase();
+    for(var ni=0;ni<nomesAdultos.length;ni++){
+      if(nomeLower.indexOf(nomesAdultos[ni])>=0){ nomeAdulto=true; break; }
+    }
+  }
+  var papelAdulto = (p.papel==='familiar'||p.papel==='amigo'||p.papel==='outro');
+  var temFoto = !!imageUrl; // Se tem foto, o modelo vai usar a referência
+
+  if(p.papel === 'protagonista'){
+    if(ST.idadeCrianca && parseInt(ST.idadeCrianca) <= 8){
+      descFisica = 'young child approximately '+ST.idadeCrianca+' years old, small and cute, ';
+    } else if(ST.idadeCrianca){
+      descFisica = 'child approximately '+ST.idadeCrianca+' years old, ';
+    }
+  } else if(nomeAdulto || papelAdulto){
+    var generoAv='';
+    var nomesMascAv=['pai','papai','papa','tio','irmao','primo','vovo','avô','padrinho','professor'];
+    var nomesFemAv=['mae','mamae','tia','irma','prima','vovó','madrinha','professora'];
+    if(p.nome){
+      var nLav=p.nome.toLowerCase();
+      for(var gma=0;gma<nomesMascAv.length;gma++){if(nLav.indexOf(nomesMascAv[gma])>=0){generoAv='male man, masculine face and features, ';break;}}
+      if(!generoAv){for(var gfa=0;gfa<nomesFemAv.length;gfa++){if(nLav.indexOf(nomesFemAv[gfa])>=0){generoAv='female woman, feminine face and features, ';break;}}}
+    }
+    descFisica = 'ADULT character, '+generoAv+'mature face with adult proportions, NOT a baby NOT an infant, adult chibi style, ';
   }
 
   var prompt;
@@ -957,37 +1234,39 @@ async function gerarAvatarDalle(p){
       + 'Squishbook signature art style: ultra soft squishy plush doll, '
       + 'oversized glossy eyes with sparkle, chubby body, tiny nose, '
       + cor + ' color palette, pastel colors, fluffy plush texture, '
-      + 'white clean background, centered full body, high quality childrens book illustration. '
-      + 'NO text, NO watermark.';
+      + 'FULL BODY visible from head to toe, centered in frame, PURE WHITE BACKGROUND, NO glow, NO halo, NO circular frame. '
+      + 'high quality childrens book illustration. '
+      + 'NO text, NO watermark, NO background glow, NO circular border.';
   } else {
-    prompt = 'Squishbook style chibi character. '
+    prompt = 'Squishbook style chibi character, FULL BODY from head to feet visible, centered in frame. '
       + 'ABSOLUTE RULE: HUMAN CHARACTER ONLY - never an animal, never has fur, never has animal features. '
       + 'This is a real human person turned into an adorable chibi illustration. '
+      + 'MANDATORY: show the COMPLETE character including head, torso, arms, legs and feet. DO NOT crop. '
       + descFisica
       + 'CRITICAL: carefully observe the reference photo and copy: '
       + 'exact hair color and texture (dark, light, curly, straight, long, short), '
       + 'skin tone (fair, medium, dark), eye color, face shape, '
-      + 'facial hair if present, any other distinctive features. '
+      + 'facial hair if present (beard, stubble), any other distinctive features. '
       + 'The character MUST be immediately recognizable as the same person from the photo. '
       + expressao + '. '
       + 'Squishbook art style: ultra soft squishy human plush doll character, '
       + 'oversized glossy eyes with sparkle highlights, chubby round human face, rosy cheeks, tiny button nose, '
-      + 'big head small body chibi proportions, '
+      + 'big head small body chibi proportions, short stubby legs visible, '
       + cor + ' clothing and accent colors, '
-      + 'soft pastel shading with gentle gradients, clean white background, '
-      + 'high quality digital illustration, professional childrens book style. '
+      + 'soft pastel shading with gentle gradients, PURE WHITE BACKGROUND only, NO glow, NO halo, NO circular frame, NO vignette, NO gradient background. '
+      + 'full body portrait, high quality digital illustration, professional childrens book style. '
       + 'HUMAN ONLY - strictly no animal features, no fur, no snout, no claws, no tail. '
-      + 'NO text, NO watermark.';
+      + 'NO text, NO watermark, NO cropping, NO circular border, NO background glow.';
   }
 
   try{
-    var model = (!ehPet && imageUrl) ? 'fal-ai/flux-pulid' : 'fal-ai/flux/schnell';
+    var model = (!ehPet && imageUrl) ? 'fal-ai/flux-pulid' : 'fal-ai/flux-pro';
     var body = (!ehPet && imageUrl)
-      ? {prompt:prompt, reference_image_url:imageUrl, num_images:1, image_size:'square_hd', guidance_scale:8}
-      : {prompt:prompt, num_images:1, image_size:'square_hd'};
+      ? {prompt:TRIGGER+' '+prompt, reference_image_url:imageUrl, num_images:1, image_size:'square_hd', guidance_scale:12, num_inference_steps:30, loras:[{path:LORA_URL,scale:LORA_SCALE}]}
+      : {prompt:TRIGGER+' '+prompt, num_images:1, image_size:'square_hd', loras:[{path:LORA_URL,scale:LORA_SCALE}]};
     var ctrl=new AbortController();
     var tmout=setTimeout(function(){ctrl.abort();},45000);
-    var res = await fetch('https://squishbook-backend.onrender.com/api/avatar', {
+    var res = await fetch('https://squishbook-backend-v2.onrender.com/api/avatar', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:model,payload:body}),
@@ -1067,20 +1346,109 @@ function s6(c){
     +'<label class="campo-label">Seu email \u{1F4E7}</label>'
     +'<input type="email" placeholder="exemplo@email.com" value="'+ST.email+'" oninput="ST.email=this.value"/>'
     +'</div>'
+    +'<div style="background:rgba(37,211,102,.07);border:1.5px solid rgba(37,211,102,.35);border-radius:14px;padding:14px 16px;margin-top:14px">'
+    +'<label class="campo-label" style="color:#1a7a3a">💬 WhatsApp <span style="font-weight:400;color:var(--texto-sec)">(opcional, para atualizações do pedido)</span></label>'
+    +'<input type="tel" placeholder="(11) 99999-9999" value="'+ST.telefone+'" oninput="ST.telefone=this.value" style="font-size:1rem"/>'
+    +'</div>'
+    +(ST.formato==='impresso'
+      ? '<div style="background:var(--azul-pal);border:1.5px solid var(--azul-cl);border-radius:16px;padding:20px;margin-top:18px">'
+        +'<div style="font-family:\'Baloo 2\',cursive;font-size:1rem;font-weight:800;color:var(--azul-deep);margin-bottom:14px">\u{1F4E6} Endereço de entrega</div>'
+        // CEP
+        +'<div class="campo-group">'
+        +'<label class="campo-label">CEP</label>'
+        +'<div style="display:flex;gap:10px">'
+        +'<input type="text" id="inpCep" placeholder="00000-000" maxlength="9" value="'+ST.endereco.cep+'" '
+        +'oninput="ST.endereco.cep=this.value.replace(/\\D/g,\'\').replace(/(\\d{5})(\\d)/,\'$1-$2\');this.value=ST.endereco.cep;if(ST.endereco.cep.replace(/\\D/g,\'\').length===8)buscarCep(ST.endereco.cep)" '
+        +'style="flex:1;max-width:160px"/>'
+        +'<button onclick="buscarCep(ST.endereco.cep)" style="padding:0 18px;border-radius:12px;background:var(--azul-esc);border:none;color:white;font-family:\'Baloo 2\',cursive;font-weight:700;font-size:.85rem;cursor:pointer">Buscar</button>'
+        +'<span id="cepStatus" style="font-size:.8rem;color:var(--texto-sec);align-self:center"></span>'
+        +'</div></div>'
+        // Logradouro + Número
+        +'<div style="display:grid;grid-template-columns:1fr 100px;gap:12px;margin-top:12px">'
+        +'<div class="campo-group" style="margin:0">'
+        +'<label class="campo-label">Rua / Avenida</label>'
+        +'<input type="text" id="inpLogradouro" placeholder="Rua das Flores" value="'+ST.endereco.logradouro+'" oninput="ST.endereco.logradouro=this.value"/>'
+        +'</div>'
+        +'<div class="campo-group" style="margin:0">'
+        +'<label class="campo-label">Número</label>'
+        +'<input type="text" id="inpNumero" placeholder="123" value="'+ST.endereco.numero+'" oninput="ST.endereco.numero=this.value"/>'
+        +'</div>'
+        +'</div>'
+        // Complemento
+        +'<div class="campo-group" style="margin-top:12px">'
+        +'<label class="campo-label">Complemento <span style="font-weight:400;color:var(--texto-sec)">(opcional)</span></label>'
+        +'<input type="text" id="inpComplemento" placeholder="Apto 42, Bloco B..." value="'+ST.endereco.complemento+'" oninput="ST.endereco.complemento=this.value"/>'
+        +'</div>'
+        // Bairro + Cidade + Estado
+        +'<div style="display:grid;grid-template-columns:1fr 1fr 80px;gap:12px;margin-top:12px">'
+        +'<div class="campo-group" style="margin:0">'
+        +'<label class="campo-label">Bairro</label>'
+        +'<input type="text" id="inpBairro" placeholder="Centro" value="'+ST.endereco.bairro+'" oninput="ST.endereco.bairro=this.value"/>'
+        +'</div>'
+        +'<div class="campo-group" style="margin:0">'
+        +'<label class="campo-label">Cidade</label>'
+        +'<input type="text" id="inpCidade" placeholder="São Paulo" value="'+ST.endereco.cidade+'" oninput="ST.endereco.cidade=this.value"/>'
+        +'</div>'
+        +'<div class="campo-group" style="margin:0">'
+        +'<label class="campo-label">Estado</label>'
+        +'<input type="text" id="inpEstado" placeholder="SP" maxlength="2" value="'+ST.endereco.estado+'" oninput="ST.endereco.estado=this.value.toUpperCase();this.value=ST.endereco.estado"/>'
+        +'</div>'
+        +'</div>'
+        +'</div>'
+      : ''
+    )
     +'<div class="erro-msg" id="erroF">Escolha um formato e informe seu email.</div>'
     +'<div class="btn-row"><button class="btn btn-secondary" onclick="voltar()">\u2190 Voltar</button><button class="btn btn-primary" onclick="av6()">Confirmar \u2192</button></div>';
 }
 function selFmt(id){
   ST.formato=id;
-  var cards=document.querySelectorAll('.fmt-card');
-  for(var i=0;i<cards.length;i++){
-    var m=cards[i].getAttribute('onclick').match(/'(\w+)'/);
-    if(m) cards[i].classList.toggle('selected',m[1]===id);
-  }
+  // Re-renderiza s6 para mostrar/esconder campo de endereco
+  var c=document.getElementById('cardContent');
+  if(c) s6(c);
 }
 function av6(){
-  if(!ST.formato||!ST.email.includes('@')){document.getElementById('erroF').classList.add('show');return;}
+  var emailOk=/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ST.email);
+  if(!ST.formato||!emailOk){document.getElementById('erroF').classList.add('show');return;}
+  // Valida endereço se impresso
+  if(ST.formato==='impresso'){
+    var end=ST.endereco;
+    if(!end.cep||!end.logradouro||!end.numero||!end.bairro||!end.cidade||!end.estado){
+      document.getElementById('erroF').textContent='Preencha o endereço completo para entrega do livro impresso.';
+      document.getElementById('erroF').classList.add('show');
+      return;
+    }
+  }
   ST.step=7; render();
+}
+
+async function buscarCep(cep){
+  var c=cep.replace(/\D/g,'');
+  if(c.length!==8) return;
+  var status=document.getElementById('cepStatus');
+  if(status) status.textContent='Buscando...';
+  try{
+    var r=await fetch('https://viacep.com.br/ws/'+c+'/json/');
+    var d=await r.json();
+    if(d.erro){if(status)status.textContent='CEP não encontrado.';return;}
+    ST.endereco.logradouro=d.logradouro||'';
+    ST.endereco.bairro=d.bairro||'';
+    ST.endereco.cidade=d.localidade||'';
+    ST.endereco.estado=d.uf||'';
+    var inpL=document.getElementById('inpLogradouro');
+    var inpB=document.getElementById('inpBairro');
+    var inpC=document.getElementById('inpCidade');
+    var inpE=document.getElementById('inpEstado');
+    if(inpL) inpL.value=ST.endereco.logradouro;
+    if(inpB) inpB.value=ST.endereco.bairro;
+    if(inpC) inpC.value=ST.endereco.cidade;
+    if(inpE) inpE.value=ST.endereco.estado;
+    if(status) status.textContent='✅ CEP encontrado!';
+    // Foca no campo número
+    var inpN=document.getElementById('inpNumero');
+    if(inpN) setTimeout(function(){inpN.focus();},100);
+  }catch(e){
+    if(status) status.textContent='Erro ao buscar CEP.';
+  }
 }
 
 // S7: RESUMO
@@ -1094,7 +1462,11 @@ function s7(c){
   var chipsHtml='';
   for(var i=0;i<ST.personagens.length;i++){
     var p=ST.personagens[i];
-    var fHtml=p.fotoUrl?'<img src="'+p.fotoUrl+'" style="width:30px;height:30px;border-radius:50%;object-fit:cover"/>':'<div style="width:30px;height:30px;border-radius:50%;background:var(--azul-cl);display:flex;align-items:center;justify-content:center;font-size:.9rem">\u2728</div>';
+    var fHtml=p.avatarUrl
+      ?'<img src="'+p.avatarUrl+'" style="width:30px;height:30px;border-radius:50%;object-fit:cover"/>'
+      :p.fotoUrl
+        ?'<img src="'+p.fotoUrl+'" style="width:30px;height:30px;border-radius:50%;object-fit:cover"/>'
+        :'<div style="width:30px;height:30px;border-radius:50%;background:var(--azul-cl);display:flex;align-items:center;justify-content:center;font-size:.9rem">\u2728</div>';
     var pl=PAPEIS.filter(function(r){return r.v===p.papel;})[0].l;
     chipsHtml+='<div class="p-chip">'+fHtml+'<div><div class="p-chip-nome">'+p.nome+'</div><div class="p-chip-papel">'+pl+'</div></div></div>';
   }
@@ -1114,6 +1486,8 @@ function s7(c){
     +extLinha
     +'<div class="resumo-item"><strong>\u{1F4B0} Total</strong><span class="resumo-preco">R$ '+fmtMoney(total)+'</span></div>'
     +'<div class="resumo-item"><strong>\u{1F4E7} Email</strong><span>'+ST.email+'</span></div>'
+    +(ST.telefone?'<div class="resumo-item"><strong>\u{1F4F1} WhatsApp</strong><span>'+ST.telefone+'</span></div>':'')
+    +(ST.formato==='impresso'&&ST.endereco.cep?'<div class="resumo-item"><strong>\u{1F4E6} Endereço</strong><span>'+ST.endereco.logradouro+', '+ST.endereco.numero+(ST.endereco.complemento?' '+ST.endereco.complemento:'')+' — '+ST.endereco.bairro+', '+ST.endereco.cidade+'/'+ST.endereco.estado+' — CEP '+ST.endereco.cep+'</span></div>':'')
     +'</div>'
     +'<div class="btn-row"><button class="btn btn-secondary" onclick="voltar()">\u2190 Ajustar</button><button class="btn btn-sucesso" onclick="finalizar()">\u2705 Finalizar R$ '+fmtMoney(total)+'</button></div>'
     +'<div style="text-align:center;margin-top:10px"><button onclick="ST.step=8;render()" style="background:none;border:none;font-size:.76rem;color:var(--texto-sec);cursor:pointer;text-decoration:underline">\uD83E\uDDEA Modo teste: ver livro sem pagar</button></div>';
@@ -1138,41 +1512,155 @@ async function finalizar(){
     +'<div class="loading-txt">Preparando pagamento...</div>'
     +'<div class="loading-sub">Aguarde um instante</div></div>';
   try{
-    var res=await fetch('https://squishbook-backend.onrender.com/api/pagamento',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        items:[{title:'Squishbook - '+ST.historia.titulo,
-          description:'Livro personalizado para '+ST.personagens[0].nome+' ('+(fmtObj?fmtObj.t:'Digital')+')',
-          quantity:1,unit_price:total,currency_id:'BRL'}],
-        payer:{email:ST.email},
-        back_urls:{
-          success:window.location.origin+'/criar.html?status=aprovado',
-          failure:window.location.origin+'/criar.html?status=erro',
-          pending:window.location.origin+'/criar.html?status=pendente'
-        },
-        auto_return:'approved',statement_descriptor:'SQUISHBOOK',
-        external_reference:ST.personagens[0].nome+'_'+Date.now()
-      })
-    });
-    var data=await res.json();
-    if(data.init_point){window.location.href=data.init_point;}
-    else throw new Error('sem init_point');
+    // Abre link de pagamento MP em nova aba (digital R$79 / impresso R$159)
+    var linkMP = ST.formato === 'impresso' ? 'https://mpago.la/2NR4wsz' : 'https://mpago.la/1U9tCUv';
+    window.open(linkMP, '_blank');
+    // Mostra tela de aguardando pagamento
+    var elPag=document.getElementById('cardContent');
+    if(elPag) elPag.innerHTML='<div class="sucesso-wrap">'      +'<span class="sucesso-emoji">💳</span>'      +'<h2 class="sucesso-titulo">Finalize o pagamento</h2>'      +'<p class="sucesso-desc">Uma nova aba foi aberta com a página de pagamento seguro do Mercado Pago.</p>'      +'<p class="sucesso-desc" style="font-size:.85rem;color:var(--texto-sec)">Após confirmar o pagamento, clique no botão abaixo para gerar seu livro.</p>'      +'<div class="btn-row">'      +'<button class="btn btn-sucesso" onclick="salvarClienteEGerar()">✅ Já paguei — Gerar meu livro!</button>'      +'</div>'      +'<div style="text-align:center;margin-top:12px">'      +'<a href="'+linkMP+'" target="_blank" style="font-size:.8rem;color:var(--azul-esc)">Abrir pagamento novamente</a>'      +'</div>'      +'</div>';
+    return;
+    // placeholder para o catch não quebrar
+    var data = {};
+    if(false) throw new Error('never');
   }catch(e){
-    // Demo: vai direto para pos-pagamento
-    ST.step=8; render();
+    var elErr=document.getElementById('cardContent');
+    if(elErr) elErr.innerHTML='<div class="sucesso-wrap">'      +'<span class="sucesso-emoji">⚠️</span>'      +'<h2 class="sucesso-titulo">Problema no pagamento</h2>'      +'<p class="sucesso-desc">Nao foi possivel processar o pagamento. Tente novamente em instantes.</p>'      +'<div class="btn-row"><button class="btn btn-primary" onclick="ST.step=7;render()">Tentar novamente</button></div>'      +'</div>';
+    console.error('Erro pagamento:', e&&e.message?e.message:e);
   }
 }
 
 // ═══ TELA POS-PAGAMENTO (step 8) ════════════════════════════
+async function salvarClienteEGerar(){
+  // Salva cliente no backend (email + telefone) antes de gerar o livro
+  try{
+    var fmtObj=FORMATOS.filter(function(f){return f.id===ST.formato;})[0];
+    var total=(fmtObj?fmtObj.p:0)+ST.extras*PRECO_EXTRA;
+    await fetch('https://squishbook-backend-v2.onrender.com/api/clientes',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        email: ST.email,
+        telefone: ST.telefone||'',
+        nome_crianca: ST.personagens[0]?ST.personagens[0].nome:'',
+        formato: ST.formato||'digital',
+        valor: total,
+        titulo_livro: ST.historia?ST.historia.titulo:'',
+        endereco: ST.formato==='impresso'?ST.endereco:null
+      })
+    });
+  }catch(e){ /* não bloqueia o fluxo se falhar */ }
+  ST.step=8; render();
+}
 function sfim(c){
-  // Verifica se veio do MP com status
   var urlParams=new URLSearchParams(window.location.search);
   var status=urlParams.get('status');
   if(status==='erro'){ mostrarErro(c); return; }
-
-  // Inicia geração das cenas
   ST.step=8;
+  // Impresso: mostra aprovação da história antes de gerar imagens
+  if(ST.formato==='impresso'){
+    mostrarAprovacaoHistoria(c);
+  } else {
+    mostrarGerando(c);
+    gerarCenas().then(function(){ mostrarPosPagamento(c); });
+  }
+}
+
+function mostrarAprovacaoHistoria(c){
+  // Monta preview das cenas da história para aprovação
+  var paginas = ST.historia.paginas||[];
+  var paginasHtml = '';
+  if(paginas.length){
+    paginasHtml = paginas.map(function(p,i){
+      return '<div style="background:var(--cinza);border-radius:12px;padding:14px 16px;margin-bottom:10px">'
+        +'<div style="font-size:.72rem;font-weight:800;color:var(--azul-esc);text-transform:uppercase;margin-bottom:4px">Página '+(i+1)+': '+p.titulo+'</div>'
+        +'<div style="font-size:.85rem;color:var(--texto);line-height:1.6;white-space:pre-line">'+p.texto+'</div>'
+        +'</div>';
+    }).join('');
+  } else {
+    // narrativo: mostra inicio/meio/fim
+    var ini = (ST.historia.inicio||'').split('\n\n').slice(0,3).join('\n\n');
+    var mei = (ST.historia.meio||'').split('\n\n').slice(0,3).join('\n\n');
+    var fim2 = (ST.historia.fim||'').split('\n\n').slice(0,2).join('\n\n');
+    paginasHtml = '<div style="background:var(--cinza);border-radius:12px;padding:14px 16px;margin-bottom:10px">'
+      +'<div style="font-size:.72rem;font-weight:800;color:var(--azul-esc);text-transform:uppercase;margin-bottom:4px">Início</div>'
+      +'<div style="font-size:.85rem;color:var(--texto);line-height:1.6;white-space:pre-line">'+ini+'</div></div>'
+      +'<div style="background:var(--cinza);border-radius:12px;padding:14px 16px;margin-bottom:10px">'
+      +'<div style="font-size:.72rem;font-weight:800;color:var(--azul-esc);text-transform:uppercase;margin-bottom:4px">Meio</div>'
+      +'<div style="font-size:.85rem;color:var(--texto);line-height:1.6;white-space:pre-line">'+mei+'</div></div>'
+      +'<div style="background:var(--cinza);border-radius:12px;padding:14px 16px;margin-bottom:10px">'
+      +'<div style="font-size:.72rem;font-weight:800;color:var(--azul-esc);text-transform:uppercase;margin-bottom:4px">Final</div>'
+      +'<div style="font-size:.85rem;color:var(--texto);line-height:1.6;white-space:pre-line">'+fim2+'</div></div>';
+  }
+
+  c.innerHTML='<div class="slabel">Quase lá! 📖</div>'
+    +'<h2 class="stit">Revise sua história</h2>'
+    +'<p class="sdesc">Leia com calma. Se quiser algum ajuste, clique em <strong>Pedir ajuste</strong>. Temos '+(2-ST.rodadasAjuste)+' ajuste(s) disponível(is).</p>'
+    +'<div style="background:white;border:2px solid var(--borda);border-radius:14px;padding:16px 18px;margin-bottom:16px">'
+    +'<div style="font-family:Baloo 2,cursive;font-size:1.1rem;font-weight:800;color:var(--azul-deep);margin-bottom:12px">'+ST.historia.emoji+' '+ST.historia.titulo+'</div>'
+    +paginasHtml
+    +'</div>'
+    +'<div class="btn-row">'
+    +(ST.rodadasAjuste<2?'<button class="btn btn-secondary" onclick="pedirAjusteHistoria()">✏️ Pedir ajuste ('+(2-ST.rodadasAjuste)+' restante'+(ST.rodadasAjuste===1?'':'s')+')</button>':'')
+    +'<button class="btn btn-sucesso" onclick="aprovarHistoriaImpresso()">✅ Aprovar e gerar livro!</button>'
+    +'</div>';
+}
+
+// rodadasAjuste já inicializado dentro do ST
+
+async function pedirAjusteHistoria(){
+  // Cria modal inline em vez de usar prompt() nativo do browser
+  var c=document.getElementById('cardContent');
+  var modalId='ajusteModal';
+  // Remove modal anterior se existir
+  var old=document.getElementById(modalId);
+  if(old) old.remove();
+  var modal=document.createElement('div');
+  modal.id=modalId;
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px;animation:fadeIn .2s';
+  modal.innerHTML='<div style="background:white;border-radius:24px;padding:32px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.2)">'
+    +'<div style="font-family:\'Baloo 2\',cursive;font-size:1.2rem;font-weight:800;color:var(--azul-deep);margin-bottom:8px">✏️ O que deseja ajustar?</div>'
+    +'<p style="font-size:.88rem;color:var(--texto-sec);margin-bottom:14px">Descreva com detalhes o que gostaria de mudar na história.</p>'
+    +'<textarea id="ajusteTxt" style="width:100%;border:2px solid var(--borda);border-radius:12px;padding:12px;font-family:\'Nunito\',sans-serif;font-size:.92rem;min-height:100px;outline:none;resize:vertical" placeholder="Ex: Quero que o Benício encontre um dragão azul, a história ficou curta..." onfocus="this.style.borderColor=\'var(--azul)\'"></textarea>'
+    +'<div style="display:flex;gap:10px;margin-top:16px">'
+    +'<button onclick="document.getElementById(\''+modalId+'\').remove()" style="flex:1;padding:12px;border-radius:50px;background:white;border:2px solid var(--borda);font-family:\'Baloo 2\',cursive;font-weight:700;cursor:pointer;color:var(--texto-sec)">Cancelar</button>'
+    +'<button onclick="confirmarAjusteHistoria(\''+modalId+'\')" style="flex:2;padding:12px;border-radius:50px;background:linear-gradient(135deg,var(--azul-esc),var(--roxo-esc));border:none;color:white;font-family:\'Baloo 2\',cursive;font-weight:800;cursor:pointer">Aplicar ajuste</button>'
+    +'</div></div>';
+  document.body.appendChild(modal);
+  setTimeout(function(){var t=document.getElementById('ajusteTxt');if(t)t.focus();},100);
+}
+
+async function confirmarAjusteHistoria(modalId){
+  var txt=document.getElementById('ajusteTxt');
+  var ajuste=txt?txt.value.trim():'';
+  var modal=document.getElementById(modalId);
+  if(!ajuste){if(txt)txt.style.borderColor='var(--erro)';return;}
+  if(modal) modal.remove();
+  if(ST.rodadasAjuste>=2) return;
+  ST.rodadasAjuste++;
+  var c=document.getElementById('cardContent');
+  c.innerHTML='<div class="loading-wrap"><div class="loading-spinner"></div><div class="loading-txt">Ajustando sua história...</div></div>';
+  try{
+    var proto=ST.personagens[0];
+    var nomesExatos=ST.personagens.map(function(p){return '"'+p.nome+'"';}).join(', ');
+    var historiaAtual=JSON.stringify(ST.historia);
+    var res=await fetch('https://squishbook-backend-v2.onrender.com/api/historia',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:6000,messages:[{role:'user',content:'Voce gerou esta historia: '+historiaAtual+'\n\nO cliente pediu o seguinte ajuste: '+ajuste+'\n\nREGRA ABSOLUTA DE NOMES: use EXATAMENTE os nomes: '+nomesExatos+'. NUNCA invente nomes. Mantenha o mesmo formato JSON. Responda APENAS com o JSON atualizado, sem markdown.'}]})
+    });
+    var data=await res.json();
+    if(data.content&&data.content[0]&&data.content[0].text){
+      var raw=data.content[0].text.trim().replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+      ST.historia=JSON.parse(raw);
+    }
+    mostrarAprovacaoHistoria(c);
+  }catch(e){
+    mostrarAprovacaoHistoria(document.getElementById('cardContent'));
+  }
+}
+
+function aprovarHistoriaImpresso(){
+  var c=document.getElementById('cardContent');
+  // Gera 12 cenas para impresso
   mostrarGerando(c);
   gerarCenas().then(function(){ mostrarPosPagamento(c); });
 }
@@ -1189,24 +1677,49 @@ function mostrarErro(c){
 
 function mostrarGerando(c){
   var etapas=[
-    {id:'e1',txt:'Analisando a historia e as cenas...'},
-    {id:'e2',txt:'Gerando imagem da capa...'},
-    {id:'e3',txt:'Criando ilustracoes de cada pagina...'},
-    {id:'e4',txt:'Montando o livro com diagramacao...'},
-    {id:'e5',txt:'Preparando o PDF final...'}
+    {id:'e1',txt:'Preparando os personagens com carinho...', tempo:30},
+    {id:'e2',txt:'Ilustrando cada pagina da historia...', tempo:90},
+    {id:'e3',txt:'Seu presente esta ficando lindo!', tempo:20},
+    {id:'e4',txt:'Montando o livro com todo o amor...', tempo:15},
+    {id:'e5',txt:'Quase pronto! Finalizando...', tempo:10}
   ];
+  var tempoTotal=240; // segundos estimados (6 paginas + avatares secundarios)
+  var tempoInicio=Date.now();
   var etHtml='';
   for(var i=0;i<etapas.length;i++){
     etHtml+='<div class="et" id="'+etapas[i].id+'">'
       +'<div class="et-ico">'+(i+1)+'</div>'
       +etapas[i].txt+'</div>';
   }
+  // Mensagens rotativas de tranquilidade
+  var msgs=['Estamos criando algo especial para voce...','Cada detalhe sendo preparado com cuidado...','Seu presente unico no mundo esta quase pronto...','A magia esta acontecendo agora...'];
+  var msgIdx=0;
+  var msgIv=setInterval(function(){
+    msgIdx=(msgIdx+1)%msgs.length;
+    var el=document.getElementById('loadingMsg');
+    if(el) el.textContent=msgs[msgIdx];
+    else clearInterval(msgIv);
+  },4000);
+
   c.innerHTML='<div class="gerando-cenas">'
-    +'<div class="loading-spinner" style="margin:0 auto 16px"></div>'
-    +'<div class="loading-txt">Criando seu livro...</div>'
-    +'<div class="loading-sub">Gerando as ilustracoes e montando o PDF</div>'
+    +'<div class="loading-txt" style="margin-bottom:4px">Criando seu Squishbook...</div>'
+    +'<div class="loading-sub" id="loadingMsg" style="margin-bottom:16px">Estamos criando algo especial para voce...</div>'
+    +'<div id="progressBarWrap" style="width:100%;background:var(--borda);border-radius:50px;height:10px;margin-bottom:6px;overflow:hidden"><div id="progressBar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--azul-esc),var(--roxo-esc));border-radius:50px;transition:width .5s ease"></div></div>'
+    +'<div id="progressInfo" style="display:flex;justify-content:space-between;font-size:.75rem;color:var(--texto-sec);margin-bottom:20px"><span id="progressPct">0%</span><span id="progressTimer">~2min restantes</span></div>'
     +'<div class="gerando-etapas">'+etHtml+'</div>'
     +'</div>';
+  // Inicia timer de progresso
+  var progressIv=setInterval(function(){
+    var elapsed=(Date.now()-tempoInicio)/1000;
+    var pct=Math.min(95,Math.round(elapsed/tempoTotal*100));
+    var restante=Math.max(0,Math.round((tempoTotal-elapsed)));
+    var el=document.getElementById('progressBar');
+    var pelEl=document.getElementById('progressPct');
+    var tmEl=document.getElementById('progressTimer');
+    if(el) el.style.width=pct+'%';
+    if(pelEl) pelEl.textContent=pct+'%';
+    if(tmEl) tmEl.textContent=restante>0?'~'+restante+'s restantes':'Finalizando...';
+  },500);
 }
 
 async function ativarEtapa(id){
@@ -1223,228 +1736,621 @@ async function ativarEtapa(id){
 }
 
 async function gerarCenas(){
-  // FAL_KEY agora fica segura no servidor (netlify function)
   POS.cenasGeradas=[];
 
   await ativarEtapa('e1');
 
-  // Determina paginas da historia
+  // ETAPA 1: Gera avatares dos personagens secundarios que ainda nao tem avatar
+  // Isso garante que gerarCenaPagina tenha avatarUrl disponivel para todos
+  var secsemAvatar=ST.personagens.filter(function(p){return p.papel!=='protagonista'&&!p.avatarUrl&&!p.avatarErro;});
+  if(secsemAvatar.length>0){
+    var avPromises=secsemAvatar.map(function(p){return gerarAvatarDalle(p);});
+    await Promise.all(avPromises);
+  }
+
+  // Determina número de páginas: 12 para impresso, 6 para digital
+  var totalPaginasAlvo = (ST.formato==='impresso') ? 12 : 6;
   var paginas=[];
-  if(ST.estiloFinal==='visual'&&ST.historia.paginas){
+  if(ST.estiloFinal==='visual'&&ST.historia.paginas&&ST.historia.paginas.length>=totalPaginasAlvo){
     paginas=ST.historia.paginas;
+  } else if(ST.estiloFinal==='visual'&&ST.historia.paginas&&ST.historia.paginas.length>0){
+    // Se tem menos páginas que o alvo, duplica as existentes com variações
+    paginas=ST.historia.paginas;
+    while(paginas.length<totalPaginasAlvo){
+      var base=paginas[paginas.length%ST.historia.paginas.length];
+      paginas=paginas.concat([{num:paginas.length+1,titulo:base.titulo+' (continuação)',texto:base.texto}]);
+    }
+    paginas=paginas.slice(0,totalPaginasAlvo);
   } else {
-    // Divide narrativo em 3 cenas principais
+    // Monta 6 paginas a partir dos 3 blocos narrativos
+    var blocos=[];
+    var ini=(ST.historia.inicio||'').split('\n\n').filter(function(b){return b.trim().length>10;});
+    var mei=(ST.historia.meio||'').split('\n\n').filter(function(b){return b.trim().length>10;});
+    var fim=(ST.historia.fim||'').split('\n\n').filter(function(b){return b.trim().length>10;});
+    // 2 paginas do inicio, 2 do meio, 2 do fim
     paginas=[
-      {num:1,titulo:'O inicio da aventura',texto:ST.historia.inicio?ST.historia.inicio.split('\n\n')[0]:''},
-      {num:2,titulo:'O momento de tensao',texto:ST.historia.meio?ST.historia.meio.split('\n\n')[2]:''},
-      {num:3,titulo:'O final emocionante',texto:ST.historia.fim?ST.historia.fim.split('\n\n')[0]:''}
+      {num:1,titulo:'O começo',texto:(ini[0]||'')+(ini[1]?'\n\n'+ini[1]:'')},
+      {num:2,titulo:'A descoberta',texto:(ini[2]||mei[0]||'')+(ini[3]||mei[1]?'\n\n'+(ini[3]||mei[1]):'')},
+      {num:3,titulo:'O desafio',texto:(mei[0]||'')+(mei[1]?'\n\n'+mei[1]:'')},
+      {num:4,titulo:'O momento decisivo',texto:(mei[2]||mei[1]||'')+(mei[3]?'\n\n'+mei[3]:'')},
+      {num:5,titulo:'A superação',texto:(fim[0]||'')+(fim[1]?'\n\n'+fim[1]:'')},
+      {num:6,titulo:'O final feliz',texto:(fim[2]||fim[1]||'')+(fim[3]?'\n\n'+fim[3]:'')},
     ];
+    paginas=paginas.filter(function(pg){return pg.texto&&pg.texto.trim().length>20;});
   }
 
   await ativarEtapa('e2');
 
-  // Gera cena para cada pagina em paralelo (com limite de 3 simultâneas)
-  var BATCH=3;
-  for(var b=0;b<paginas.length;b+=BATCH){
-    var lote=paginas.slice(b,b+BATCH);
-    var promises=lote.map(function(pg,li){return gerarCenaPagina(pg,b+li);});
-    var resultados=await Promise.all(promises);
-    for(var r=0;r<resultados.length;r++){
-      POS.cenasGeradas.push(resultados[r]);
-    }
+  // ETAPA 2: Gera cenas 1 por vez com retry automatico em caso de falha
+  for(var b=0;b<paginas.length;b++){
+    var resultado=await gerarCenaPaginaComRetry(paginas[b],b);
+    POS.cenasGeradas.push(resultado);
   }
 
   await ativarEtapa('e3');
-  await new Promise(function(r){setTimeout(r,500);});
+  await new Promise(function(r){setTimeout(r,400);});
   await ativarEtapa('e4');
-  await new Promise(function(r){setTimeout(r,500);});
+  await new Promise(function(r){setTimeout(r,400);});
   await ativarEtapa('e5');
 
-  // Marca ultima como feita
   var ult=document.getElementById('e5');
   if(ult){ult.className='et feita';ult.querySelector('.et-ico').textContent='\u2713';}
+  // Completa a barra
+  if(typeof progressIv!=='undefined') clearInterval(progressIv);
+  var pb=document.getElementById('progressBar');
+  var pp=document.getElementById('progressPct');
+  var pt=document.getElementById('progressTimer');
+  if(pb) pb.style.width='100%';
+  if(pp) pp.textContent='100%';
+  if(pt) pt.textContent='Pronto!';
   await new Promise(function(r){setTimeout(r,400);});
+}
+
+// Monta descrição dos personagens da cena para o prompt
+function descreverPersonagemParaPrompt(p, expressao, isPrincipal){
+  var ehPet=p.papel==='pet';
+  var cor={
+    protagonista:'sky blue, golden yellow and white',
+    familiar:'soft rose pink, warm cream and lilac',
+    amigo:'purple, lavender and mint',
+    pet:'warm brown, cream and forest green',
+    outro:'orange, peach and yellow'
+  }[p.papel]||'pastel multicolor';
+  if(ehPet){
+    return 'a super cute Squishbook kawaii chibi fluffy pet animal with '+cor+' colors, '+expressao+', '
+      +'ultra soft squishy plush doll style, oversized glossy eyes with sparkle, chubby body, tiny nose';
+  }
+  var base='a Squishbook chibi human character';
+  if(isPrincipal) base='the MAIN Squishbook chibi character (protagonist)';
+  // Detecta adulto pelo papel
+  var adultoDesc='';
+  // Todo familiar ou "outro" é tratado como adulto por padrão (avós, mães, pais, tios)
+  var papelAdultoCena=(p.papel==='familiar'||p.papel==='outro');
+  var nomeAdultoCena=false;
+  var nomesAdultosCena=['pai','papai','papa','mae','mamae','mamãe','mãe','mama','tio','tia','vovo','vovô','vovó','avo','avô','avó','irmao','irma','primo','prima','padrinho','madrinha'];
+  if(p.nome){var nL=p.nome.toLowerCase();for(var i=0;i<nomesAdultosCena.length;i++){if(nL.indexOf(nomesAdultosCena[i])>=0){nomeAdultoCena=true;break;}}}
+  // Detecta gênero pelo nome — papel > lista de papéis > terminação do nome
+  var generoDesc='';
+  var nomesMascCena=['pai','papai','papa','tio','irmao','primo','vovo','vovô','avo','avô','padrinho'];
+  var nomesFemCena=['mae','mamae','mamãe','mãe','mama','tia','irma','prima','vovó','avó','madrinha'];
+  if(p.nome){
+    var nLg=p.nome.toLowerCase();
+    // 1. Busca por palavras de papel masculino/feminino no nome
+    for(var gm=0;gm<nomesMascCena.length;gm++){if(nLg.indexOf(nomesMascCena[gm])>=0){generoDesc='male man, masculine features, ';break;}}
+    if(!generoDesc){for(var gf=0;gf<nomesFemCena.length;gf++){if(nLg.indexOf(nomesFemCena[gf])>=0){generoDesc='female woman, feminine features, ';break;}}}
+    // 2. Se não achou por papel, detecta pelo primeiro nome (terminação comum no português)
+    if(!generoDesc){
+      var primeiroNome=nLg.split(' ')[0];
+      // Nomes masculinos comuns terminados em o, os, el, er, on, im, in, o, u
+      var terminacaoMasc=['marcelo','carlos','paulo','joao','joão','pedro','lucas','rafael','felipe','gabriel',
+        'antonio','antônio','roberto','luis','luís','francisco','jose','josé','mario','mário',
+        'andre','andrè','thiago','rodrigo','fernando','gustavo','ricardo','eduardo','leandro',
+        'caio','diego','vitor','victor','mateus','matheus','henrique','renato','fabio','fábio',
+        'celso','sergio','sérgio','jorge','marcos','alex','daniel','danilo','bruno','julio','júlio'];
+      var terminacaoFem=['fran','franciely','maria','ana','julia','júlia','patricia','patrícia',
+        'mariana','fernanda','amanda','camila','gabriela','leticia','letícia','beatriz',
+        'isabela','isabella','carolina','carina','claudia','cláudia','vanessa','jessica',
+        'jéssica','priscila','renata','sabrina','tatiana','tatiane','veronica','verónica',
+        'katia','kátia','lucia','lúcia','monica','mônica','sonia','sônia','vera','helena',
+        'alice','laura','emma','sofia','valentina','larissa','bruna','aline','paula','elisa',
+        'ellem','lorena','gabi','karina'];
+      for(var nm=0;nm<terminacaoMasc.length;nm++){if(primeiroNome===terminacaoMasc[nm]||primeiroNome.startsWith(terminacaoMasc[nm])){generoDesc='male man, masculine features, ';break;}}
+      if(!generoDesc){
+        for(var nf=0;nf<terminacaoFem.length;nf++){if(primeiroNome===terminacaoFem[nf]||primeiroNome.startsWith(terminacaoFem[nf])){generoDesc='female woman, feminine features, ';break;}}
+      }
+      // 3. Fallback por terminação da letra final
+      if(!generoDesc){
+        if(primeiroNome.endsWith('o')||primeiroNome.endsWith('os')) generoDesc='male man, masculine features, ';
+        else if(primeiroNome.endsWith('a')||primeiroNome.endsWith('as')) generoDesc='female woman, feminine features, ';
+      }
+    }
+  }
+  // Para familiar sem gênero detectado, default masculino (mais comum como "Papai")
+  if(!generoDesc && papelAdultoCena) generoDesc='adult person, ';
+  if(nomeAdultoCena||papelAdultoCena) adultoDesc='ADULT character, '+generoDesc+'mature adult face, clearly NOT a child, taller than children, ';
+  return base+', '+adultoDesc+'HUMAN ONLY no fur no animal features, '
+    +'ultra soft squishy human plush doll, oversized glossy eyes with sparkle highlights, '
+    +'chubby round human face, rosy cheeks, big head small body chibi proportions, '
+    +cor+' clothing, '+expressao;
+}
+
+// Gera descrição do cenário via Claude com base no texto real da página
+async function gerarDescricaoCenario(texto, titulo, roteiro){
+  var fallbacks={
+    aventura:'lush enchanted forest trail with ancient trees, magical glowing mushrooms and golden sunrays',
+    amizade:'sunny colorful playground with swings, slides and bright flowers in warm afternoon light',
+    familia:'warm cozy living room with soft sofa, family photos on wall, fireplace and colorful rugs',
+    magia:'magical sparkling castle hall with floating crystals, glowing orbs and starry vaulted ceiling',
+    animal:'peaceful sunlit meadow with tall grass, wildflowers and a winding stream through rolling hills',
+    sonho:'dreamy cloudscape with fluffy pink clouds, floating islands and soft pastel sky at golden hour',
+    terror:'spooky moonlit forest clearing with twisted trees, glowing fog and eerie purple shadows'
+  };
+  var fallback=fallbacks[roteiro]||fallbacks.familia;
+  try{
+    var prompt='Read this childrens book page and return ONLY a background setting description in English for an image generator.\n\n'
+      +'Page title: '+titulo+'\nPage text: '+texto+'\nStory theme: '+roteiro+'\n\n'
+      +'Return ONLY a single sentence (max 20 words) describing the BACKGROUND SETTING. '
+      +'NO characters. ONLY English. ONLY one sentence. Example: "cozy bakery kitchen with flour-dusted wooden counters and warm oven glow"';
+    var res=await fetch('https://squishbook-backend-v2.onrender.com/api/historia',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:100,messages:[{role:'user',content:prompt}]})
+    });
+    if(!res.ok) return fallback;
+    var data=await res.json();
+    var txt=data.content&&data.content[0]&&data.content[0].text;
+    if(txt&&txt.trim().length>10) return txt.trim().replace(/["""]/g,'').replace(/^[^a-zA-Z]+/,'');
+    return fallback;
+  }catch(e){ return fallback; }
+}
+
+async function gerarCenaPaginaComRetry(pg, idx){
+  // Tenta gerar a cena com retry automatico
+  for(var tentativa=0;tentativa<2;tentativa++){
+    try{
+      var resultado=await gerarCenaPagina(pg,idx);
+      if(resultado.url) return resultado; // sucesso
+      // Se falhou mas sem exception, tenta novamente
+      if(tentativa===0) await new Promise(function(r){setTimeout(r,2000);});
+    }catch(e){
+      if(tentativa===0) await new Promise(function(r){setTimeout(r,2000);});
+    }
+  }
+  // Fallback final: gera cena simples sem referencia de avatar
+  try{
+    var textoFallback=pg.texto||pg.titulo||'';
+    var nomeProt=ST.personagens[0].nome||'o protagonista';
+    var promptFallback=TRIGGER+' Squishbook childrens book illustration. '
+      +'A cute chibi child character named '+nomeProt+' in a colorful storybook scene. '
+      +(textoFallback.substring(0,100)+'. ')
+      +'Art style: soft pastel watercolor, warm magical lighting, professional storybook illustration. '
+      +'NO text, NO watermark.';
+    var rf=await fetch('https://squishbook-backend-v2.onrender.com/api/avatar',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'fal-ai/flux-pro',payload:{prompt:promptFallback,num_images:1,image_size:'landscape_4_3',loras:[{path:LORA_URL,scale:LORA_SCALE}]}}),
+    });
+    var df=await rf.json();
+    var urlF=df.images&&df.images[0]&&df.images[0].url;
+    return {pg:pg,idx:idx,url:urlF||null,erro:!urlF};
+  }catch(e){
+    return {pg:pg,idx:idx,url:null,erro:true};
+  }
 }
 
 async function gerarCenaPagina(pg,idx){
   var parsNaPg=[];
+  var textoCombinadoBusca=(pg.texto||'').toLowerCase()+' '+(pg.titulo||'').toLowerCase();
+
+  // Mapeamento de apelidos/variações para facilitar o match
+  // Cobre variações de escrita, acentuação e apelidos familiares
+  var aliasMap={
+    'papai':['papai','pai','papa','daddy','dad','o pai','o papai'],
+    'mamae':['mamae','mamãe','mae','mãe','mama','mommy','mom','a mae','a mamae','mamãe'],
+    'vovo':['vovo','vovô','vovó','avo','avô','avó','vô','vó','vovó','vovô'],
+    'tio':['tio','uncle','o tio'],
+    'tia':['tia','aunt','a tia'],
+    'irmao':['irmao','irmão','brother','o irmao','o irmão'],
+    'irma':['irma','irmã','sister','a irma','a irmã'],
+    'primo':['primo','cousin','o primo'],
+    'prima':['prima','a prima'],
+    'padrinho':['padrinho','godfather','o padrinho'],
+    'madrinha':['madrinha','godmother','a madrinha']
+  };
+  // Também adiciona o primeiro nome de cada personagem como alias
+  // Ex: "Katia Takase" → busca por "katia" também
+  var aliasExtra={};
+  for(var ae=0;ae<ST.personagens.length;ae++){
+    var pae=ST.personagens[ae];
+    if(pae.papel==='protagonista'||!pae.nome) continue;
+    var primNome=pae.nome.split(' ')[0].toLowerCase();
+    if(primNome.length>=3) aliasExtra[pae.nome.toLowerCase()]=[primNome];
+  }
+
   for(var i=0;i<ST.personagens.length;i++){
     var p=ST.personagens[i];
-    if(p.nome&&pg.texto&&pg.texto.toLowerCase().indexOf(p.nome.toLowerCase())>=0){
+    if(p.papel==='protagonista'){ parsNaPg.push(p); continue; } // protagonista sempre aparece
+    if(!p.nome) continue;
+
+    // REGRA: familiar/amigo sempre aparecem (personagem central do livro)
+    // Só personagens do tipo "outro" precisam ser mencionados no texto para aparecer
+    if(p.papel==='familiar'||p.papel==='amigo'){
       parsNaPg.push(p);
+      continue;
     }
+
+    var nomeLower=p.nome.toLowerCase();
+    // Busca direta pelo nome
+    var achouNome=textoCombinadoBusca.indexOf(nomeLower)>=0;
+    // Busca por aliases comuns
+    if(!achouNome){
+      for(var ak in aliasMap){
+        if(nomeLower.indexOf(ak)>=0||ak.indexOf(nomeLower)>=0){
+          var aliases=aliasMap[ak];
+          for(var ai=0;ai<aliases.length;ai++){
+            if(textoCombinadoBusca.indexOf(aliases[ai])>=0){ achouNome=true; break; }
+          }
+        }
+        if(achouNome) break;
+      }
+    }
+    // Busca por primeiro nome (ex: "Katia" encontra "Katia Takase")
+    if(!achouNome && aliasExtra[nomeLower]){
+      var extAliases=aliasExtra[nomeLower];
+      for(var xi=0;xi<extAliases.length;xi++){
+        if(textoCombinadoBusca.indexOf(extAliases[xi])>=0){ achouNome=true; break; }
+      }
+    }
+    if(achouNome) parsNaPg.push(p);
   }
+  // Garante que protagonista está sempre presente
   if(parsNaPg.length===0) parsNaPg=[ST.personagens[0]];
+  // Remove duplicatas
+  parsNaPg=parsNaPg.filter(function(p,i,arr){return arr.indexOf(p)===i;});
 
   var textoLower=(pg.texto||'').toLowerCase();
   var tituloLower=(pg.titulo||'').toLowerCase();
   var combinado=textoLower+' '+tituloLower;
   var roteiro=ST.roteiro||'aventura';
 
-  // Expressão baseada no texto
+  // Expressão por página baseada no texto
   var expressao='joyful and curious';
-  if(combinado.indexOf('assust')>-1||combinado.indexOf('medo')>-1||combinado.indexOf('terror')>-1) expressao='scared but brave';
-  else if(combinado.indexOf('triste')>-1||combinado.indexOf('chor')>-1) expressao='sad and emotional';
-  else if(combinado.indexOf('alegr')>-1||combinado.indexOf('feliz')>-1||combinado.indexOf('sorri')>-1) expressao='very happy, big smile';
-  else if(combinado.indexOf('corag')>-1||combinado.indexOf('heroi')>-1) expressao='brave and determined';
-  else if(combinado.indexOf('surpres')>-1||combinado.indexOf('espant')>-1) expressao='amazed and surprised';
-  else if(combinado.indexOf('dormi')>-1||combinado.indexOf('sonho')>-1) expressao='sleepy and dreamy';
-  else if(combinado.indexOf('corr')>-1||combinado.indexOf('brinc')>-1) expressao='excited and playful';
+  if(combinado.indexOf('assust')>-1||combinado.indexOf('medo')>-1||combinado.indexOf('tremeu')>-1) expressao='scared but brave, wide nervous eyes, tense posture';
+  else if(combinado.indexOf('triste')>-1||combinado.indexOf('chor')>-1) expressao='sad and emotional, teary eyes, slumped posture';
+  else if(combinado.indexOf('alegr')>-1||combinado.indexOf('feliz')>-1||combinado.indexOf('sorri')>-1||combinado.indexOf('rindo')>-1) expressao='very happy, big beaming smile, arms raised in joy';
+  else if(combinado.indexOf('corag')>-1||combinado.indexOf('heroi')>-1||combinado.indexOf('determin')>-1) expressao='brave and determined, fists clenched, strong confident pose';
+  else if(combinado.indexOf('surpres')>-1||combinado.indexOf('espant')>-1||combinado.indexOf('incrivel')>-1) expressao='amazed and surprised, mouth open wide, hands on cheeks';
+  else if(combinado.indexOf('dormi')>-1||combinado.indexOf('sonho')>-1) expressao='sleepy and dreamy, eyes half closed, floating gently';
+  else if(combinado.indexOf('corr')>-1||combinado.indexOf('brinc')>-1||combinado.indexOf('animado')>-1) expressao='excited and playful, running pose, arms spread wide';
+  else if(combinado.indexOf('abraco')>-1||combinado.indexOf('amor')>-1||combinado.indexOf('junto')>-1) expressao='warm and loving, open arms, glowing heart expression';
+  else if(combinado.indexOf('chorando')>-1||combinado.indexOf('lagrima')>-1) expressao='crying tears of joy, emotional smile, hand on heart';
+  if(roteiro==='terror') expressao='scared but curious, wide glowing eyes, trembling';
 
-  // Cenário
-  var cenario='warm cozy living room with soft sofa, family photos on wall, fireplace and colorful rugs';
-  if(combinado.indexOf('quarto')>-1||combinado.indexOf('cama')>-1) cenario='cozy magical bedroom with glowing fairy lights, colorful pillows, moonlight through curtains, stuffed animals on shelves';
-  else if(combinado.indexOf('floresta')>-1||combinado.indexOf('mata')>-1||combinado.indexOf('arvore')>-1) cenario='enchanted forest with giant glowing trees, magical fireflies, golden light through leaves, mushrooms and flowers';
-  else if(combinado.indexOf('praia')>-1||combinado.indexOf('mar')>-1) cenario='sunny magical beach with crystal blue sea, colorful seashells, golden sand and gentle waves';
-  else if(combinado.indexOf('escola')>-1||combinado.indexOf('aula')>-1) cenario='cheerful bright classroom with rainbow desks, drawings on chalkboard, sunlight through windows';
-  else if(combinado.indexOf('parque')>-1||combinado.indexOf('jardim')>-1||combinado.indexOf('quintal')>-1) cenario='magical colorful garden with giant blooming flowers, butterflies, green hills and bright blue sky';
-  else if(combinado.indexOf('cozinha')>-1||combinado.indexOf('bolo')>-1) cenario='warm cozy kitchen with cakes on table, golden oven glow and colorful pots';
-  else if(combinado.indexOf('ceu')>-1||combinado.indexOf('nuvem')>-1||combinado.indexOf('voar')>-1) cenario='magical sky on giant fluffy clouds, rainbow, golden sunlight, colorful hot air balloons';
-  else if(combinado.indexOf('castelo')>-1) cenario='fairy tale castle hall with colorful banners, glowing windows, shiny stone floors';
-  else if(combinado.indexOf('espaco')>-1||combinado.indexOf('estrela')>-1||combinado.indexOf('planeta')>-1) cenario='magical outer space with colorful planets, sparkly stars and glowing moon';
-  else if(combinado.indexOf('assombra')>-1||combinado.indexOf('fantasma')>-1) cenario='spooky haunted house with glowing pumpkins, bats, purple moonlight and twisted trees';
-  else if(combinado.indexOf('montanha')>-1||combinado.indexOf('topo')>-1) cenario='dramatic mountain top with golden treasure chests, clouds below, epic sunset sky';
+    // Ação conjunta entre personagens (quando 2+)
+  var acaoConjunta='interacting naturally, physically close together in the scene';
+  if(parsNaPg.length>=2){
+    if(combinado.indexOf('abraco')>-1||combinado.indexOf('abraca')>-1||combinado.indexOf('junto')>-1||combinado.indexOf('apertad')>-1) acaoConjunta='hugging each other tightly, faces close, very emotional';
+    else if(combinado.indexOf('corr')>-1||combinado.indexOf('brinc')>-1||combinado.indexOf('pula')>-1) acaoConjunta='running and jumping together, arms spread wide with joy';
+    else if(combinado.indexOf('assust')>-1||combinado.indexOf('medo')>-1||combinado.indexOf('tremeu')>-1) acaoConjunta='one holding the other protectively, both scared, looking at the threat';
+    else if(combinado.indexOf('descobr')>-1||combinado.indexOf('encontr')>-1||combinado.indexOf('olha')>-1) acaoConjunta='both pointing and looking at something with wide amazed eyes';
+    else if(combinado.indexOf('ajud')>-1||combinado.indexOf('segur')>-1||combinado.indexOf('mao')>-1) acaoConjunta='holding hands, one helping the other forward';
+    else if(combinado.indexOf('chora')>-1||combinado.indexOf('lagrima')>-1||combinado.indexOf('triste')>-1) acaoConjunta='one comforting the other with a gentle hand on shoulder, sad but caring';
+    else if(combinado.indexOf('celebr')>-1||combinado.indexOf('vitoria')>-1||combinado.indexOf('hurra')>-1||combinado.indexOf('feliz')>-1) acaoConjunta='both jumping with arms raised in celebration, huge smiles';
+    else if(combinado.indexOf('conversa')>-1||combinado.indexOf('fala')>-1||combinado.indexOf('diz')>-1) acaoConjunta='facing each other, one talking expressively, the other listening with big eyes';
+    else acaoConjunta='physically together, clearly interacting with each other, facing each other or touching';
+  }
 
-  // Atmosfera por roteiro
+  // Gera descrição do cenário via IA com base no texto real da página
+  var cenario = await gerarDescricaoCenario(pg.texto||'', pg.titulo||'', roteiro);
+
+  // Atmosfera
   var atmosfera;
-  if(roteiro==='terror') atmosfera='dark spooky horror mood, deep shadows, eerie cold purple moonlight, creepy mist, dramatic horror lighting, dark purples and cold blues';
+  if(roteiro==='terror') atmosfera='dark spooky horror mood, deep shadows, eerie cold purple moonlight, creepy mist, dramatic horror lighting, dark purples and cold blues, cute but scary atmosphere';
   else if(roteiro==='aventura') atmosfera='epic adventurous mood, dramatic golden hour lighting, heroic energy, warm golds and rich blues';
-  else if(roteiro==='magia') atmosfera='magical enchanted mood, soft glowing sparkles, ethereal light, dreamy pastel mist, wonder and amazement';
+  else if(roteiro==='magia') atmosfera='magical enchanted mood, soft glowing sparkles, ethereal light, dreamy pastel mist';
   else if(roteiro==='familia') atmosfera='warm cozy family mood, soft golden indoor lighting, heartwarming and tender feeling';
-  else if(roteiro==='amizade') atmosfera='joyful cheerful mood, bright colorful lighting, playful and fun energy, rainbow colors';
+  else if(roteiro==='amizade') atmosfera='joyful cheerful mood, bright colorful lighting, playful and fun energy';
   else if(roteiro==='animal') atmosfera='warm natural mood, soft sunlight through trees, gentle peaceful outdoor feeling';
   else if(roteiro==='sonho') atmosfera='dreamy hopeful mood, soft ethereal lighting, floating clouds, gentle pastel glow';
   else atmosfera='warm magical storybook mood, soft colorful lighting, joyful feeling';
 
-  // PASSO 1: Gera cenário puro com flux/schnell (SEM personagem)
-  var cenarioPrompt='Squishbook childrens book background illustration, NO characters, NO people, NO children. '
-    +'SETTING: '+cenario+'. '
-    +atmosfera+'. '
-    +'Wide angle view showing the full environment. '
-    +'Art style: soft pastel watercolor, warm magical lighting, professional storybook illustration. '
-    +'NO characters, NO people, NO children in the image.';
+  // Personagens com avatarUrl disponíveis para usar como referência
+  var parsComAvatar=parsNaPg.filter(function(p){return p.avatarUrl;});
+  var parsSeAvatar=parsNaPg.filter(function(p){return !p.avatarUrl;});
 
   try{
-    var ctrl=new AbortController();
-    var tmout=setTimeout(function(){ctrl.abort();},45000);
-    var res=await fetch('https://squishbook-backend.onrender.com/api/avatar',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        model:'fal-ai/flux/schnell',
-        payload:{prompt:cenarioPrompt,num_images:1,image_size:'landscape_4_3',num_inference_steps:4}
-      }),
-      signal:ctrl.signal
-    });
-    clearTimeout(tmout);
-    var data=await res.json();
-    var cenarioUrl=data.images&&data.images[0]&&data.images[0].url;
+    var cenaUrl=null;
 
-    if(!cenarioUrl) return {pg:pg,idx:idx,url:null,erro:true};
+    if(parsComAvatar.length===0){
+      // ── Nenhum avatar: gera cena completa com flux/schnell ──────────────────
+      var descs=parsNaPg.map(function(p,i){return descreverPersonagemParaPrompt(p,expressao,i===0);}).join(' and ');
+      var prompt='Squishbook childrens book illustration. '
+        +'SCENE: '+descs+(parsNaPg.length>=2?' '+acaoConjunta:'.')+' '
+        +'SETTING: '+cenario+'. '
+        +atmosfera+'. '
+        +'Art style: soft pastel watercolor, warm magical lighting, professional storybook illustration, '
+        +'chibi kawaii characters fully integrated into the background scene, no white background, no cutouts. '
+        +'NO text, NO watermark.';
+      var r1=await fetch('https://squishbook-backend-v2.onrender.com/api/avatar',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({model:'fal-ai/flux-pro',payload:{prompt:TRIGGER+' '+prompt,num_images:1,image_size:'landscape_4_3',loras:[{path:LORA_URL,scale:LORA_SCALE}]}})
+      });
+      var d1=await r1.json();
+      cenaUrl=d1.images&&d1.images[0]&&d1.images[0].url;
 
-    // PASSO 2: Composite no canvas — cenário + avatar(s) do personagem
-    // Pega o avatar do primeiro personagem na cena
-    var avatarPersonagens=parsNaPg.filter(function(p){return p.avatarUrl;});
-    if(avatarPersonagens.length===0){
-      // Sem avatar: retorna só o cenário
-      return {pg:pg,idx:idx,url:cenarioUrl,erro:false};
+    } else if(parsComAvatar.length===1){
+      // ── 1 avatar disponível: flux-pulid para máxima fidelidade ─────────────
+      var p0=parsComAvatar[0];
+      // Descreve quem é o personagem de referência para o modelo entender o contexto
+      var qualPersonagem = p0.papel==='protagonista'
+        ? 'the child protagonist ('+p0.nome+')'
+        : 'the '+(p0.papel==='familiar'?'parent/family member':'secondary character')+' ('+p0.nome+')';
+      var descOutros=parsSeAvatar.length>0
+        ? ' Also in the scene: '+parsSeAvatar.map(function(p,i){
+            var desc=descreverPersonagemParaPrompt(p,expressao,false);
+            var roleDesc=p.papel==='familiar'?'family member/parent':'companion';
+            return desc+' (named '+p.nome+', a '+roleDesc+' character who MUST appear in this scene)';
+          }).join(' and ')+','
+        : '';
+      var acaoDesc=parsNaPg.length>=2?' '+acaoConjunta+',':'';
+      // Determina se o personagem de referência é o protagonista ou o familiar
+      var isProtRef = p0.papel === 'protagonista';
+      var outroDesc = parsSeAvatar.length > 0 || (parsNaPg.length > 1 && parsComAvatar.length === 1)
+        ? ' IMPORTANT: The scene MUST show BOTH '+p0.nome+' AND '
+          + parsNaPg.filter(function(px){return px!==p0;}).map(function(px){return px.nome;}).join(' and ')
+          + ' together in the same scene.'
+        : '';
+      var nomesSec = parsNaPg.filter(function(px){return px!==p0;}).map(function(px){return px.nome;}).join(' and ');
+      // Monta descrição física detalhada do personagem secundário para forçar presença
+      var secDesc = parsNaPg.filter(function(px){return px!==p0;}).map(function(px){
+        return descreverPersonagemParaPrompt(px, expressao, false);
+      }).join(' and ');
+      var nomesSec2 = parsNaPg.filter(function(px){return px!==p0;}).map(function(px){return px.nome;}).join(' and ');
+      var prompt2=''
+        +'SCENE: '+acaoConjunta+'. '
+        +'SETTING: '+cenario+'. '
+        +atmosfera+'. '
+        +'CHARACTER 1 (reference photo): '+qualPersonagem+'. '
+        +(nomesSec2?'CHARACTER 2 (draw from text description): '+secDesc+', named '+nomesSec2+', MUST be visible in this scene. ':'')
+        +'Both characters MUST appear in the image. '
+        +'Squishbook chibi kawaii art style, soft pastel watercolor, warm magical lighting, professional childrens book illustration. '
+        +'Both characters fully visible from head to toe, chibi proportions, integrated into background. '
+        +'NO text, NO watermark.';
+      var ctrl2=new AbortController();
+      var tmout2=setTimeout(function(){ctrl2.abort();},90000);
+      var r2=await fetch('https://squishbook-backend-v2.onrender.com/api/avatar',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({model:'fal-ai/flux-pulid',payload:{prompt:TRIGGER+' '+prompt2,reference_image_url:p0.avatarUrl,num_images:1,image_size:'landscape_4_3',guidance_scale:4,num_inference_steps:30,loras:[{path:LORA_URL,scale:LORA_SCALE}]}}),
+        signal:ctrl2.signal
+      });
+      clearTimeout(tmout2);
+      var d2=await r2.json();
+      cenaUrl=d2.images&&d2.images[0]&&d2.images[0].url;
+
+      // Fallback: se flux-pulid falhou, usa composite manual com remoção de fundo
+      if(!cenaUrl){
+        var bgPrompt='Squishbook childrens book background, NO characters, NO people. SETTING: '+cenario+'. '+atmosfera+'. Wide angle, soft pastel watercolor, warm magical lighting. NO text, NO characters.';
+        var rb=await fetch('https://squishbook-backend-v2.onrender.com/api/avatar',{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({model:'fal-ai/flux-pro',payload:{prompt:bgPrompt,num_images:1,image_size:'landscape_4_3',loras:[{path:LORA_URL,scale:LORA_SCALE}]}})
+        });
+        var db=await rb.json();
+        var bgUrl=db.images&&db.images[0]&&db.images[0].url;
+        if(bgUrl) cenaUrl=await compositeComRemocaoFundo(bgUrl,[p0],parsNaPg.length);
+      }
+
+    } else {
+      // ── 2+ avatares: usa pulid para o protagonista + composite para os demais ──
+      // Estratégia: gera a cena principal com flux-pulid usando o avatar do protagonista,
+      // depois tenta composite dos demais por cima. Se falhar, usa composite puro.
+      var prot2=parsComAvatar.filter(function(p){return p.papel==='protagonista';})[0]||parsComAvatar[0];
+      var outros2=parsComAvatar.filter(function(p){return p!==prot2;});
+      var descOutros2=outros2.length>0
+        ? ' Also in the scene: '+outros2.map(function(p){
+            return descreverPersonagemParaPrompt(p,expressao,false)+' (this is '+p.nome+', a real character from the story)';
+          }).join(' and ')+','
+        : '';
+      var descSemAv2=parsSeAvatar.length>0
+        ? ' And: '+parsSeAvatar.map(function(p){
+            return descreverPersonagemParaPrompt(p,expressao,false)+' ('+p.nome+', '+p.papel+')';
+          }).join(' and ')+','
+        : '';
+      var acaoDesc2=parsNaPg.length>=2?' '+acaoConjunta+',':'';
+      // Descreve os outros personagens de forma muito explícita para o modelo
+      var nomeOutros2=outros2.map(function(p){return p.nome+'('+p.papel+')';}).join(' and ');
+      var promptMulti=''
+        +'SCENE: '+acaoConjunta+'. '
+        +'SETTING: '+cenario+'. '
+        +atmosfera+'. '
+        +'CHARACTER 1 (reference photo): '+prot2.nome+', the '+(prot2.papel==='protagonista'?'child protagonist':'main character')+'. '
+        +(nomeOutros2?'CHARACTER 2 (draw from text description): '+descOutros2+', named '+nomeOutros2+', MUST be visible in this scene. ':'')
+        +(descSemAv2?'ADDITIONAL CHARACTERS: '+descSemAv2:'')
+        +'Both characters MUST appear in the image. '
+        +'Squishbook chibi kawaii art style, soft pastel watercolor, warm magical lighting, professional childrens book illustration. '
+        +'Both characters fully visible from head to toe, chibi proportions, integrated into background. '
+        +'NO text, NO watermark.';
+      var ctrlM=new AbortController();
+      var tmoutM=setTimeout(function(){ctrlM.abort();},90000);
+      try{
+        var rM=await fetch('https://squishbook-backend-v2.onrender.com/api/avatar',{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({model:'fal-ai/flux-pulid',payload:{prompt:TRIGGER+' '+promptMulti,reference_image_url:prot2.avatarUrl,num_images:1,image_size:'landscape_4_3',guidance_scale:4,num_inference_steps:30,loras:[{path:LORA_URL,scale:LORA_SCALE}]}}),
+          signal:ctrlM.signal
+        });
+        clearTimeout(tmoutM);
+        var dM=await rM.json();
+        cenaUrl=dM.images&&dM.images[0]&&dM.images[0].url;
+      }catch(e){ clearTimeout(tmoutM); cenaUrl=null; }
+
+      // Fallback: composite puro se pulid falhou
+      if(!cenaUrl){
+      // Gera cenário base
+      var bgPrompt2='Squishbook childrens book background illustration, NO characters, NO people, NO children. '
+        +'SETTING: '+cenario+'. '+atmosfera+'. '
+        +'Wide angle view showing the full environment. '
+        +'Art style: soft pastel watercolor, warm magical lighting, professional storybook illustration.';
+      var rb2=await fetch('https://squishbook-backend-v2.onrender.com/api/avatar',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({model:'fal-ai/flux-pro',payload:{prompt:bgPrompt2,num_images:1,image_size:'landscape_4_3',loras:[{path:LORA_URL,scale:LORA_SCALE}]}})
+      });
+      var db2=await rb2.json();
+      var bgUrl2=db2.images&&db2.images[0]&&db2.images[0].url;
+      if(!bgUrl2) return {pg:pg,idx:idx,url:null,erro:true};
+
+      // Usa os avatarUrls já gerados no passo de revisão — sem regerar, preserva fidelidade
+      var avatarsParaCompor=parsComAvatar.map(function(pav){
+        return {avatarUrl:pav.avatarUrl,papel:pav.papel};
+      });
+
+      cenaUrl=await compositeComRemocaoFundo(bgUrl2, avatarsParaCompor, parsNaPg.length);
+      } // fecha fallback composite
     }
 
-    // Compõe no canvas
-    var compositeUrl=await compositeAvatarNaCena(cenarioUrl, avatarPersonagens, expressao, parsNaPg.length);
-    return {pg:pg,idx:idx,url:compositeUrl||cenarioUrl,erro:false};
-
+    return {pg:pg,idx:idx,url:cenaUrl||null,erro:!cenaUrl};
   }catch(e){
-    console.error('Erro cena '+idx+':', e&&e.message?e.message:e);
+    console.error('Erro cena '+idx,e&&e.message?e.message:e);
     return {pg:pg,idx:idx,url:null,erro:true};
   }
 }
 
-// Compõe avatar(s) sobre o cenário usando Canvas
-function compositeAvatarNaCena(cenarioUrl, avatarPersonagens, expressao, totalParsNaPg){
+// Remove o fundo branco/claro de uma imagem de avatar usando canvas
+// Usa flood fill a partir dos 4 cantos para preservar rostos e detalhes internos
+async function removerFundoBranco(imgUrl){
   return new Promise(function(resolve){
+    var img=new Image();
+    img.crossOrigin='anonymous';
+    img.onload=function(){
+      var canvas=document.createElement('canvas');
+      canvas.width=img.width; canvas.height=img.height;
+      var ctx=canvas.getContext('2d');
+      ctx.drawImage(img,0,0);
+      var data=ctx.getImageData(0,0,canvas.width,canvas.height);
+      var d=data.data;
+      var w=canvas.width, h=canvas.height;
+      var visited=new Uint8Array(w*h);
+
+      // Detecta cor de fundo amostrando os 4 cantos
+      function getPixel(x,y){ var i=(y*w+x)*4; return [d[i],d[i+1],d[i+2]]; }
+      var corners=[getPixel(0,0),getPixel(w-1,0),getPixel(0,h-1),getPixel(w-1,h-1)];
+      var bgR=Math.round((corners[0][0]+corners[1][0]+corners[2][0]+corners[3][0])/4);
+      var bgG=Math.round((corners[0][1]+corners[1][1]+corners[2][1]+corners[3][1])/4);
+      var bgB=Math.round((corners[0][2]+corners[1][2]+corners[2][2]+corners[3][2])/4);
+
+      var threshold=35; // tolerância conservadora para preservar bordas
+
+      function isBg(x,y){
+        var i=(y*w+x)*4;
+        return Math.abs(d[i]-bgR)<threshold &&
+               Math.abs(d[i+1]-bgG)<threshold &&
+               Math.abs(d[i+2]-bgB)<threshold;
+      }
+
+      // Flood fill iterativo a partir dos cantos
+      var stack=[];
+      function addIfBg(x,y){
+        if(x<0||x>=w||y<0||y>=h) return;
+        var idx=y*w+x;
+        if(!visited[idx]&&isBg(x,y)){ visited[idx]=1; stack.push(x,y); }
+      }
+
+      // Semeia a partir de toda a borda da imagem
+      for(var x=0;x<w;x++){ addIfBg(x,0); addIfBg(x,h-1); }
+      for(var y=0;y<h;y++){ addIfBg(0,y); addIfBg(w-1,y); }
+
+      while(stack.length){
+        var cy=stack.pop(); var cx=stack.pop();
+        var pi=(cy*w+cx)*4;
+        d[pi+3]=0; // torna transparente
+        addIfBg(cx+1,cy); addIfBg(cx-1,cy);
+        addIfBg(cx,cy+1); addIfBg(cx,cy-1);
+      }
+
+      // Suaviza bordas: faz um passe de semi-transparência nas bordas de transição
+      for(var by=1;by<h-1;by++){
+        for(var bx=1;bx<w-1;bx++){
+          var bi=(by*w+bx)*4;
+          if(d[bi+3]===255){ // pixel visível
+            // Verifica se algum vizinho é transparente (borda)
+            var temVizinhoTransp=
+              d[((by-1)*w+bx)*4+3]===0 || d[((by+1)*w+bx)*4+3]===0 ||
+              d[(by*w+(bx-1))*4+3]===0 || d[(by*w+(bx+1))*4+3]===0;
+            if(temVizinhoTransp) d[bi+3]=200; // suaviza borda
+          }
+        }
+      }
+
+      ctx.putImageData(data,0,0);
+      resolve(canvas);
+    };
+    img.onerror=function(){resolve(null);};
+    img.src=imgUrl;
+  });
+}
+
+// Compõe avatares (com remoção de fundo) sobre o cenário
+async function compositeComRemocaoFundo(cenarioUrl, avatarPersonagens, totalParsNaPg){
+  return new Promise(async function(resolve){
     var canvas=document.createElement('canvas');
     canvas.width=800; canvas.height=600;
     var ctx=canvas.getContext('2d');
 
-    // Carrega o cenário primeiro
+    // Carrega cenário
     var cenarioImg=new Image();
     cenarioImg.crossOrigin='anonymous';
-    cenarioImg.onload=function(){
-      // Desenha o cenário cobrindo o canvas inteiro
+    cenarioImg.onload=async function(){
       ctx.drawImage(cenarioImg,0,0,800,600);
 
-      // Overlay leve para integrar os personagens
-      ctx.fillStyle='rgba(0,0,0,0.08)';
+      // Overlay leve
+      ctx.fillStyle='rgba(0,0,0,0.05)';
       ctx.fillRect(0,0,800,600);
 
-      // Posições dos avatares dependendo do número de personagens
+      // Posições e tamanhos por número de personagens
       var posicoes;
       if(avatarPersonagens.length===1){
-        // 1 personagem: centro-baixo, tamanho maior
-        posicoes=[{x:280,y:200,w:240,h:340}];
+        posicoes=[{x:260,y:160,w:280,h:380}];
       } else if(avatarPersonagens.length===2){
-        // 2 personagens: lado a lado, centro-baixo
+        // Interação: um pouco voltados um para o outro
         posicoes=[
-          {x:140,y:220,w:220,h:310},
-          {x:440,y:220,w:220,h:310}
+          {x:100,y:180,w:260,h:360},
+          {x:440,y:180,w:260,h:360}
         ];
       } else {
-        // 3+: distribuídos
         posicoes=[
-          {x:80,y:230,w:200,h:280},
-          {x:300,y:220,w:200,h:290},
-          {x:520,y:230,w:200,h:280}
+          {x:60,y:200,w:220,h:320},
+          {x:290,y:180,w:220,h:340},
+          {x:520,y:200,w:220,h:320}
         ];
       }
 
-      var loaded=0;
-      var total=Math.min(avatarPersonagens.length, posicoes.length);
-
-      function desenharAvatar(i){
-        if(i>=total){
-          // Todos carregados - exporta
-          resolve(canvas.toDataURL('image/jpeg',0.92));
-          return;
-        }
+      for(var i=0;i<Math.min(avatarPersonagens.length,posicoes.length);i++){
         var av=avatarPersonagens[i];
         var pos=posicoes[i];
-        var avImg=new Image();
-        avImg.crossOrigin='anonymous';
-        avImg.onload=function(){
-          // Sombra suave abaixo do personagem
-          ctx.save();
-          ctx.shadowColor='rgba(0,0,0,0.35)';
-          ctx.shadowBlur=20;
-          ctx.shadowOffsetY=8;
 
-          // Desenha o avatar com tamanho proporcional mantendo aspect ratio
-          var ar=avImg.width/avImg.height;
-          var dw=pos.w;
-          var dh=dw/ar;
-          if(dh>pos.h){dh=pos.h;dw=dh*ar;}
-          var dx=pos.x+(pos.w-dw)/2;
-          var dy=pos.y+(pos.h-dh);
+        // Remove fundo branco do avatar
+        var avCanvas=await removerFundoBranco(av.avatarUrl);
+        if(!avCanvas) continue;
 
-          // Remove o fundo branco/claro do avatar (os avatares têm fundo neutro)
-          // Usa compositing para blend
-          ctx.globalCompositeOperation='source-over';
-          ctx.drawImage(avImg,dx,dy,dw,dh);
-          ctx.restore();
+        // Sombra suave
+        ctx.save();
+        ctx.shadowColor='rgba(0,0,0,0.28)';
+        ctx.shadowBlur=18;
+        ctx.shadowOffsetX=0;
+        ctx.shadowOffsetY=10;
 
-          desenharAvatar(i+1);
-        };
-        avImg.onerror=function(){
-          desenharAvatar(i+1);
-        };
-        avImg.src=av.avatarUrl;
+        // Mantém aspect ratio
+        var ar=avCanvas.width/avCanvas.height;
+        var dw=pos.w;
+        var dh=dw/ar;
+        if(dh>pos.h){dh=pos.h;dw=dh*ar;}
+        var dx=pos.x+(pos.w-dw)/2;
+        var dy=pos.y+(pos.h-dh);
+
+        ctx.globalCompositeOperation='source-over';
+        ctx.drawImage(avCanvas,dx,dy,dw,dh);
+        ctx.restore();
       }
 
-      desenharAvatar(0);
+      resolve(canvas.toDataURL('image/jpeg',0.92));
     };
-    cenarioImg.onerror=function(){
-      resolve(null);
-    };
+    cenarioImg.onerror=function(){resolve(null);};
     cenarioImg.src=cenarioUrl;
   });
 }
@@ -1457,7 +2363,7 @@ function mostrarPosPagamento(c){
   var capasAvs='';
   for(var i=0;i<Math.min(ST.personagens.length,3);i++){
     var p=ST.personagens[i];
-    var src=p.avatarUrl||p.fotoUrl;
+    var src=p.avatarUrl; // Somente avatar chibi, nunca foto real
     if(src) capasAvs+='<img class="pl-capa-av" src="'+src+'"/>';
   }
 
@@ -1617,7 +2523,7 @@ async function aplicarAjuste(){
     +'\n\nResponda APENAS com o JSON no mesmo formato da historia atual (sem markdown).';
 
   try{
-    var res=await fetch('https://squishbook-backend.onrender.com/api/historia',{
+    var res=await fetch('https://squishbook-backend-v2.onrender.com/api/historia',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
@@ -1663,8 +2569,207 @@ async function enviarLivro(){
 }
 
 async function gerarPDF(){
-  // Usa sempre o fallback rico (HTML imprimivel)
-  gerarPDFFallback();
+  // Tenta gerar PDF real com jspdf + html2canvas
+  // Se não disponível, usa a janela printável como fallback
+  if(typeof window.jspdf !== 'undefined' || typeof window.jsPDF !== 'undefined'){
+    await gerarPDFReal();
+  } else {
+    gerarPDFFallback();
+  }
+}
+
+async function gerarPDFReal(){
+  var proto=ST.personagens[0];
+  var roteiro=ST.roteiro||'aventura';
+  var paletas={
+    aventura:{bg1:'#0D1E6A',bg2:'#1B4FD8',bg3:'#7C3AED',pg1:'#FFF8F0',pg2:'#F0EAFF',acc:'#F4A02D',acc2:'#1B4FD8'},
+    amizade:{bg1:'#5B1A6E',bg2:'#D4537E',bg3:'#ED93B1',pg1:'#FFF0F5',pg2:'#FDE8FF',acc:'#D4537E',acc2:'#7F77DD'},
+    familia:{bg1:'#7C2D12',bg2:'#C2410C',bg3:'#F97316',pg1:'#FFFBEB',pg2:'#FFF7F0',acc:'#F97316',acc2:'#7C2D12'},
+    magia:{bg1:'#1E1B4B',bg2:'#4C1D95',bg3:'#7C3AED',pg1:'#F5F0FF',pg2:'#EDE9FE',acc:'#8B5CF6',acc2:'#4C1D95'},
+    animal:{bg1:'#14532D',bg2:'#166534',bg3:'#4ADE80',pg1:'#F0FDF4',pg2:'#F5FFED',acc:'#16A34A',acc2:'#14532D'},
+    sonho:{bg1:'#0C4A6E',bg2:'#0369A1',bg3:'#38BDF8',pg1:'#F0F9FF',pg2:'#E0F2FE',acc:'#0EA5E9',acc2:'#0C4A6E'},
+    terror:{bg1:'#1A0A2E',bg2:'#3B0764',bg3:'#7C3AED',pg1:'#1A0A2E',pg2:'#0F0520',acc:'#A855F7',acc2:'#EC4899'}
+  };
+  var pal=paletas[roteiro]||paletas.aventura;
+  var isTerror=roteiro==='terror';
+  var txColor=isTerror?'#E9D5FF':'#180F2E';
+
+  // Monta HTML oculto para capturar página por página
+  var container=document.createElement('div');
+  container.style.cssText='position:fixed;left:-9999px;top:0;width:595px;background:white;';
+  document.body.appendChild(container);
+
+  var jsPDF=window.jspdf?window.jspdf.jsPDF:window.jsPDF;
+  var pdf=new jsPDF({orientation:'portrait',unit:'pt',format:'a5'});
+  var pgW=419; // A5 largura em pt
+  var pgH=595; // A5 altura em pt
+
+  async function capturarPagina(htmlContent, bgColor){
+    container.innerHTML='';
+    var pg=document.createElement('div');
+    pg.style.cssText='width:595px;min-height:842px;background:'+bgColor+';position:relative;overflow:hidden;';
+    pg.innerHTML=htmlContent;
+    container.appendChild(pg);
+    await new Promise(function(r){setTimeout(r,200);});
+    // Espera imagens carregarem
+    var imgs=pg.querySelectorAll('img');
+    await Promise.all(Array.from(imgs).map(function(img){
+      return new Promise(function(r){
+        if(img.complete) r();
+        else{img.onload=r;img.onerror=r;}
+      });
+    }));
+    var canvas=await html2canvas(pg,{
+      scale:1.4,useCORS:true,allowTaint:false,
+      backgroundColor:bgColor,
+      width:595,height:842,
+      logging:false
+    });
+    return canvas;
+  }
+
+  // Capas dos avatares para a capa
+  var capasHtml='';
+  for(var i=0;i<Math.min(ST.personagens.length,4);i++){
+    // Usa SOMENTE avatarUrl (chibi gerado) - nunca foto real
+    var src=ST.personagens[i].avatarUrl;
+    if(src) capasHtml+='<img src="'+src+'" style="width:90px;height:90px;border-radius:50%;border:4px solid rgba(255,255,255,.6);object-fit:cover;margin:0 -5px;display:inline-block;box-shadow:0 4px 16px rgba(0,0,0,.3)"/>';
+  }
+  var titFontSize=ST.historia.titulo.length>25?'26px':'32px';
+
+  // ── Gera imagem de capa temática ────────────────────────────────────────────
+  var roteiro2=ST.roteiro||'aventura';
+  var atmosferaCapa={
+    aventura:'epic adventurous golden hour lighting, heroic energy',
+    amizade:'joyful cheerful bright colorful lighting, playful fun',
+    familia:'warm cozy golden indoor lighting, heartwarming tender',
+    magia:'magical sparkles, ethereal light, dreamy pastel mist',
+    animal:'warm natural sunlight through trees, peaceful outdoor',
+    sonho:'dreamy ethereal lighting, floating clouds, pastel glow',
+    terror:'dark spooky purple moonlight, eerie mist, cute horror'
+  }[roteiro2]||'warm magical storybook mood';
+
+  var parsComAv=ST.personagens.filter(function(p){return p.avatarUrl;});
+  var capaImageUrl=null;
+  // Gera capa: com avatar usa flux-pulid, sem avatar usa flux-pro+LoRA
+  if(parsComAv.length===0){
+    // Nenhum personagem tem avatar — gera cena de capa genérica com LoRA
+    var nomeProt2=ST.personagens[0]?ST.personagens[0].nome:'a child';
+    var promptCapaGen='SQUISHBOOK_CHIBI Squishbook childrens book COVER ILLUSTRATION. '      +'A cute adorable chibi child protagonist named '+nomeProt2+' in a magical vibrant scene. '      +'SETTING: magical scene representing the story theme: '+roteiro2+'. '      +atmosferaCapa+'. '      +'The character is fully integrated into the background scene. '      +'Art style: Squishbook chibi kawaii, soft pastel watercolor, warm magical lighting, '      +'professional childrens book cover, vibrant colors, high quality. '      +'NO text, NO title, NO watermark.';    try{      var rCapaGen=await fetch('https://squishbook-backend-v2.onrender.com/api/avatar',{        method:'POST',headers:{'Content-Type':'application/json'},        body:JSON.stringify({model:'fal-ai/flux-pro',payload:{prompt:promptCapaGen,num_images:1,image_size:'portrait_4_3',loras:[{path:LORA_URL,scale:LORA_SCALE}]}})      });      var dCapaGen=await rCapaGen.json();      capaImageUrl=dCapaGen.images&&dCapaGen.images[0]&&dCapaGen.images[0].url;    }catch(e){ capaImageUrl=null; }  } else if(parsComAv.length>0){
+    var p0capa=parsComAv[0];
+    var descOutrosCapa=parsComAv.length>1
+      ? ' Together with another Squishbook chibi character '+parsComAv.slice(1).map(function(p){return '('+p.papel+' character)';}).join(' and ')+','
+      : '';
+    var qualRefCapaDesc=p0capa.papel==='protagonista'
+      ?'The reference image shows '+p0capa.nome+', the child protagonist. '
+      :'The reference image shows '+p0capa.nome+', the main character. ';
+    var promptCapa=qualRefCapaDesc
+      +'CHILDREN BOOK COVER. The character is centered in the image, facing the viewer, '
+      +'with a big joyful smile and arms open wide in a welcoming pose. '
+      +'PORTRAIT COMPOSITION: character fills the center and upper half of the image. '
+      +'BACKGROUND: a rich magical environment representing the story theme ('+roteiro2+'), '
+      +atmosferaCapa+'. Lush detailed background visible around the character. '
+      +'Art style: Squishbook chibi kawaii, soft pastel watercolor, warm magical lighting, '
+      +'professional childrens book cover, vibrant saturated colors, cinematic quality. '
+      +'Character fully integrated into background — no white box, no cutout, no border. '
+      +'NO text, NO title, NO watermark.';
+    try{
+      var ctrlCapa=new AbortController();
+      var tmoutCapa=setTimeout(function(){ctrlCapa.abort();},75000);
+      var resCapa=await fetch('https://squishbook-backend-v2.onrender.com/api/avatar',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({model:'fal-ai/flux-pulid',payload:{prompt:promptCapa,reference_image_url:p0capa.avatarUrl,num_images:1,image_size:'portrait_4_3',guidance_scale:3,num_inference_steps:30,loras:[{path:LORA_URL,scale:LORA_SCALE}]}}),
+        signal:ctrlCapa.signal
+      });
+      clearTimeout(tmoutCapa);
+      var dataCapa=await resCapa.json();
+      capaImageUrl=dataCapa.images&&dataCapa.images[0]&&dataCapa.images[0].url;
+    }catch(e){ capaImageUrl=null; }
+  }
+
+  // ── Capa impactante ─────────────────────────────────────────────────────────
+  var capaHtml;
+  if(capaImageUrl){
+    // CAPA COM IMAGEM: imagem ocupa tela toda, texto sobreposto com gradiente na base
+    capaHtml='<div style="width:595px;height:842px;position:relative;overflow:hidden;background:'+pal.bg1+'">'      // Imagem de fundo tela cheia
+      +'<img src="'+capaImageUrl+'" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;object-position:center top"/>'      // Gradiente escuro na base para legibilidade do texto
+      +'<div style="position:absolute;bottom:0;left:0;right:0;height:340px;background:linear-gradient(to top,rgba(0,0,0,.85) 0%,rgba(0,0,0,.6) 50%,transparent 100%)"></div>'      // Badge SQUISHBOOK no topo
+      +'<div style="position:absolute;top:24px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,.2);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.4);border-radius:30px;padding:5px 20px;font-size:9px;color:white;letter-spacing:.28em;text-transform:uppercase;font-family:Arial,sans-serif;white-space:nowrap">SQUISHBOOK</div>'      // Texto na base da imagem
+      +'<div style="position:absolute;bottom:0;left:0;right:0;padding:28px 32px;text-align:center">'      +'<div style="font-size:'+titFontSize+';font-weight:900;color:white;line-height:1.15;text-shadow:0 2px 20px rgba(0,0,0,.8);font-family:Arial,sans-serif;margin-bottom:10px">'+ST.historia.titulo+'</div>'      +'<div style="width:60px;height:2px;background:rgba(255,255,255,.6);margin:0 auto 10px"></div>'      +'<div style="font-size:10px;color:rgba(255,255,255,.75);margin-bottom:4px;font-family:Arial,sans-serif">Uma historia criada especialmente para</div>'      +'<div style="font-size:20px;font-weight:900;color:white;text-shadow:0 2px 12px rgba(0,0,0,.6);font-family:Arial,sans-serif;margin-bottom:4px">'+proto.nome+'</div>'      +'<div style="font-size:8px;color:rgba(255,255,255,.3);letter-spacing:.2em;text-transform:uppercase;font-family:Arial,sans-serif;margin-top:8px">UM PRESENTE UNICO NO MUNDO</div>'      +'</div>'      +'</div>';
+  } else {
+    // CAPA SEM IMAGEM: gradiente com avatares em destaque maior
+    var capasHtmlGrande='';
+    for(var i=0;i<Math.min(ST.personagens.length,4);i++){
+      var src2=ST.personagens[i].avatarUrl;
+      if(src2) capasHtmlGrande+='<img src="'+src2+'" style="width:110px;height:110px;border-radius:50%;border:4px solid rgba(255,255,255,.7);object-fit:cover;margin:0 -6px;display:inline-block;box-shadow:0 6px 24px rgba(0,0,0,.4)"/>';
+    }
+    capaHtml='<div style="width:595px;height:842px;background:linear-gradient(160deg,'+pal.bg1+' 0%,'+pal.bg2+' 45%,'+pal.bg3+' 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:44px 32px;position:relative;overflow:hidden;box-sizing:border-box">'      +'<div style="position:absolute;top:-80px;right:-80px;width:280px;height:280px;border-radius:50%;background:rgba(255,255,255,.05)"></div>'      +'<div style="position:absolute;bottom:-70px;left:-70px;width:240px;height:240px;border-radius:50%;background:rgba(255,255,255,.04)"></div>'      +'<div style="display:inline-block;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:30px;padding:5px 20px;font-size:9px;color:rgba(255,255,255,.8);letter-spacing:.28em;text-transform:uppercase;margin-bottom:24px;font-family:Arial,sans-serif">SQUISHBOOK</div>'      +(capasHtmlGrande?'<div style="margin-bottom:28px;display:flex;justify-content:center;align-items:center">'+capasHtmlGrande+'</div>':'')      +'<div style="font-size:'+titFontSize+';font-weight:900;color:white;margin-bottom:12px;line-height:1.15;text-shadow:0 4px 32px rgba(0,0,0,.5);font-family:Arial,sans-serif">'+ST.historia.titulo+'</div>'      +'<div style="width:80px;height:2px;background:rgba(255,255,255,.5);margin:10px auto"></div>'      +'<div style="font-size:11px;color:rgba(255,255,255,.65);margin-bottom:5px;font-family:Arial,sans-serif">Uma historia criada especialmente para</div>'      +'<div style="font-size:22px;font-weight:900;color:white;text-shadow:0 2px 16px rgba(0,0,0,.3);font-family:Arial,sans-serif">'+proto.nome+'</div>'      +'<div style="margin-top:20px;font-size:9px;color:rgba(255,255,255,.28);letter-spacing:.2em;text-transform:uppercase;font-family:Arial,sans-serif">UM PRESENTE UNICO NO MUNDO</div>'      +'</div>';
+  }
+  var capaCanvas=await capturarPagina(capaHtml,'#'+pal.bg1.replace('#',''));
+  pdf.addImage(capaCanvas.toDataURL('image/jpeg',0.92),'JPEG',0,0,pgW,pgH);
+
+  // ── Páginas da história ─────────────────────────────────────────────────────
+  var decors=[
+    '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" style="position:absolute;top:8px;right:8px;opacity:.1"><circle cx="40" cy="40" r="38" fill="'+pal.acc+'"/></svg>',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" style="position:absolute;bottom:50px;left:0;opacity:.07"><polygon points="50,0 100,100 0,100" fill="'+pal.acc2+'"/></svg>',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="90" height="90" style="position:absolute;top:10px;right:10px;opacity:.09"><rect x="10" y="10" width="70" height="70" rx="16" fill="'+pal.acc+'"/></svg>',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" style="position:absolute;bottom:45px;right:5px;opacity:.08"><ellipse cx="40" cy="40" rx="38" ry="26" fill="'+pal.acc2+'"/></svg>',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" style="position:absolute;top:5px;left:5px;opacity:.08"><circle cx="50" cy="50" r="46" fill="'+pal.acc+'"/></svg>',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="90" height="90" style="position:absolute;bottom:50px;left:5px;opacity:.08"><polygon points="45,2 56,34 90,34 63,55 73,88 45,67 17,88 27,55 0,27 34,27" fill="'+pal.acc+'"/></svg>'
+  ];
+
+  for(var i=0;i<POS.cenasGeradas.length;i++){
+    var cena=POS.cenasGeradas[i];
+    var pg2=cena.pg;
+    var bgCol=i%2===0?pal.pg1:pal.pg2;
+    var layout=i%3;
+    var imgHtml2='';
+    if(cena.url){
+      var imgStyle='border-radius:16px;object-fit:cover;box-shadow:0 6px 24px rgba(0,0,0,.15);border:3px solid rgba(255,255,255,.9);';
+      if(layout===1) imgHtml2='<img src="'+cena.url+'" style="'+imgStyle+'width:100%;height:220px;object-fit:cover;display:block;margin-bottom:16px"/>';
+      else imgHtml2='<img src="'+cena.url+'" style="'+imgStyle+'width:200px;height:160px;object-fit:cover;flex-shrink:0"/>';
+    }
+    var numBadge='<div style="display:inline-block;background:'+pal.acc+';color:white;font-size:8px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;padding:4px 14px;border-radius:20px;margin-bottom:12px;font-family:Arial,sans-serif">PAGINA '+(i+1)+'</div>';
+    var titDiv='<div style="font-size:17px;font-weight:900;color:'+pal.acc2+';margin-bottom:12px;line-height:1.2;font-family:Arial,sans-serif">'+(pg2.titulo||'')+'</div>';
+    var txtDiv='<div style="font-size:12px;color:'+txColor+';line-height:2;font-style:italic;font-family:Arial,sans-serif">'+(pg2.texto||'').replace(/\n\n/g,'<br/><br/>').replace(/\n/g,'<br/>')+'</div>';
+    var rodape='<div style="position:absolute;bottom:0;left:0;right:0;height:32px;background:linear-gradient(90deg,'+pal.bg1+','+pal.bg2+');display:flex;align-items:center;justify-content:center"><span style="font-size:8px;color:rgba(255,255,255,.35);letter-spacing:.2em;text-transform:uppercase;font-family:Arial,sans-serif">SQUISHBOOK</span></div>';
+    var inner='';
+    if(layout===1){
+      inner=imgHtml2+'<div>'+numBadge+titDiv+txtDiv+'</div>';
+    } else {
+      var flex='display:flex;gap:24px;align-items:flex-start;'+(layout===2?'flex-direction:row-reverse;':'');
+      inner='<div style="'+flex+'">'+imgHtml2+'<div style="flex:1">'+numBadge+titDiv+txtDiv+'</div></div>';
+    }
+    var pgHtml='<div style="width:595px;height:842px;background:'+bgCol+';padding:36px 40px 60px;position:relative;overflow:hidden;box-sizing:border-box">'
+      +decors[i%6]
+      +'<div style="position:relative;z-index:1">'+inner+'</div>'
+      +rodape+'</div>';
+    pdf.addPage();
+    var pgCanvas=await capturarPagina(pgHtml,bgCol);
+    pdf.addImage(pgCanvas.toDataURL('image/jpeg',0.92),'JPEG',0,0,pgW,pgH);
+  }
+
+  // ── Página final ────────────────────────────────────────────────────────────
+  var quemDa=ST.respostas.quem_da?'<div style="margin-top:16px;font-size:12px;color:rgba(255,255,255,.55);font-family:Arial,sans-serif">Um presente criado com amor por <strong style="color:rgba(255,255,255,.8)">'+ST.respostas.quem_da+'</strong></div>':'';
+  var fimHtml='<div style="width:595px;height:842px;background:linear-gradient(150deg,'+pal.bg1+','+pal.bg3+');display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:48px;position:relative;overflow:hidden;box-sizing:border-box">'
+    +'<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:320px;height:320px;border-radius:50%;background:rgba(255,255,255,.03)"></div>'
+    +'<div style="position:relative;z-index:1">'
+    +'<div style="font-size:3.5rem;margin-bottom:20px">\u2665</div>'
+    +'<div style="font-size:28px;font-weight:900;color:white;margin-bottom:24px;font-family:Arial,sans-serif">Fim</div>'
+    +(POS.mensagem?'<div style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:16px;padding:20px 26px;max-width:300px;margin:0 auto 20px"><div style="font-size:12px;color:rgba(255,255,255,.88);font-style:italic;line-height:1.9;font-family:Arial,sans-serif">&#x201C;'+POS.mensagem+'&#x201D;</div></div>':'')
+    +'<div style="font-size:11px;color:rgba(255,255,255,.42);line-height:1.9;font-family:Arial,sans-serif">Este livro foi criado com amor<br/>especialmente para <strong style="color:rgba(255,255,255,.7)">'+proto.nome+'</strong>.</div>'
+    +quemDa
+    +'<div style="margin-top:28px;font-size:9px;color:rgba(255,255,255,.2);letter-spacing:.18em;text-transform:uppercase;font-family:Arial,sans-serif">SQUISHBOOK</div>'
+    +'</div></div>';
+  pdf.addPage();
+  var fimCanvas=await capturarPagina(fimHtml,pal.bg1);
+  pdf.addImage(fimCanvas.toDataURL('image/jpeg',0.92),'JPEG',0,0,pgW,pgH);
+
+  document.body.removeChild(container);
+
+  // Download automático
+  var nomeArquivo='Squishbook_'+proto.nome.replace(/\s+/g,'_')+'_'+ST.historia.titulo.replace(/\s+/g,'_').substring(0,30)+'.pdf';
+  pdf.save(nomeArquivo);
 }
 
 function gerarPDFFallback(){
@@ -1710,10 +2815,10 @@ function gerarPDFFallback(){
     var textoDiv='<div style="font-size:13px;color:'+txColor+';line-height:2.1;font-style:italic">'+(pg.texto||'').replace(/\n\n/g,"<br/><br/>").replace(/\n/g,"<br/>")+'</div>';
     var pageContent;
     if(layout===0){
-      imgTag=imgTag.replace(imgStyle,imgStyle+';width:210px;height:210px;flex-shrink:0');
+      imgTag=imgTag.replace(imgStyle,imgStyle+';width:210px;height:175px;object-fit:cover;flex-shrink:0');
       pageContent='<div style="display:flex;gap:28px;align-items:flex-start">'+imgTag+'<div style="flex:1">'+numBadge+tituloDiv+textoDiv+'</div></div>';
     } else if(layout===1){
-      imgTag=imgTag.replace(imgStyle,imgStyle+';width:100%;height:230px');
+      imgTag=imgTag.replace(imgStyle,imgStyle+';width:100%;height:220px;object-fit:cover');
       pageContent=imgTag+'<div style="margin-top:22px">'+numBadge+tituloDiv+textoDiv+'</div>';
     } else {
       imgTag=imgTag.replace(imgStyle,imgStyle+';width:210px;height:210px;flex-shrink:0');
@@ -1756,12 +2861,14 @@ function gerarPDFFallback(){
     +'<div style="font-size:12px;color:rgba(255,255,255,.42);line-height:1.9">Este livro foi criado com amor<br/>especialmente para <strong style="color:rgba(255,255,255,.72)">'+proto.nome+'</strong>.</div>'
     +'<div style="margin-top:32px;font-size:10px;color:rgba(255,255,255,.22);letter-spacing:.18em;text-transform:uppercase">Squishbook</div>'
     +'</div></div>'
-    +'<div class="no-print" style="position:fixed;bottom:24px;right:24px;display:flex;gap:12px;z-index:9999">'
-    +'<button onclick="window.print()" style="background:linear-gradient(135deg,'+pal.bg2+','+pal.bg3+');color:white;border:none;padding:14px 32px;border-radius:50px;font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 6px 24px rgba(0,0,0,.3)">Salvar PDF</button>'
-    +'<button onclick="window.close()" style="background:white;color:#180F2E;border:2px solid #EDE8F8;padding:14px 24px;border-radius:50px;font-size:15px;font-weight:800;cursor:pointer">Fechar</button>'
-    +'</div></body></html>';
+    +'<div class="no-print" style="position:fixed;bottom:0;left:0;right:0;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;z-index:9999">'
+    +'<div style="color:rgba(255,255,255,.7);font-size:12px;line-height:1.5">📥 <strong style="color:white">Baixar PDF:</strong> Clique em <strong style="color:'+pal.acc+'">⬇️ Baixar PDF</strong> e o arquivo será salvo automaticamente no seu computador.</div>'
+    +'<div style="display:flex;gap:10px;flex-shrink:0">'
+    +'<button onclick="gerarPDFAutomatico(bookHtml, ST.historia.titulo)" style="background:linear-gradient(135deg,'+pal.bg2+','+pal.bg3+');color:white;border:none;padding:12px 28px;border-radius:50px;font-size:14px;font-weight:800;cursor:pointer;white-space:nowrap">⬇️ Baixar PDF</button>'
+    +'<button onclick="window.close()" style="background:rgba(255,255,255,.15);color:white;border:1px solid rgba(255,255,255,.3);padding:12px 20px;border-radius:50px;font-size:14px;font-weight:700;cursor:pointer">✕ Fechar</button>'
+    +'</div></div></body></html>';
   var w=window.open('','_blank','width=680,height=960');
-  if(w){w.document.write(bookHtml);w.document.close();document.fonts.ready.then(function(){setTimeout(function(){w.print();},2000);});}
+  if(w){w.document.write(bookHtml);w.document.close();}
 }
 
 function carregarImagem(url){
@@ -1795,6 +2902,33 @@ function mostrarConfirmacaoEnvio(){
     +'<div class="btn-row" style="margin-top:28px;justify-content:center">'
     +'<a href="index.html" class="btn btn-primary">Criar outro livro</a>'
     +'</div></div>';
+}
+
+async function gerarPDFAutomatico(htmlContent, titulo){
+  var btn = event && event.target;
+  if(btn){ btn.disabled=true; btn.textContent='⏳ Gerando PDF...'; }
+  try{
+    var res = await fetch('https://squishbook-backend-v2.onrender.com/api/gerar-pdf', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({html: htmlContent, titulo: titulo||'squishbook'})
+    });
+    if(!res.ok) throw new Error('Erro '+res.status);
+    var blob = await res.blob();
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = (titulo||'squishbook').replace(/[^a-z0-9]/gi,'_')+'.pdf';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 2000);
+    if(btn){ btn.disabled=false; btn.textContent='⬇️ Baixar PDF'; }
+  }catch(e){
+    // Fallback para window.print() se o backend falhar
+    if(btn){ btn.disabled=false; btn.textContent='⬇️ Salvar PDF'; }
+    alert('Baixando via impressão do navegador. Na janela que abrir, escolha "Salvar como PDF".');
+    window.print();
+  }
 }
 
 function voltar(){ if(ST.step>1){ ST.step--; render(); } }
