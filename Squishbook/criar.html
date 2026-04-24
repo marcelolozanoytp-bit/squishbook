@@ -3185,43 +3185,72 @@ async function gerarPDFReal(){
     terror:'dark spooky purple moonlight, eerie mist, cute horror'
   }[roteiro2]||'warm magical storybook mood';
 
-  var parsComAv=ST.personagens.filter(function(p){return p.avatarUrl;});
   var capaImageUrl=null;
-  // Gera capa: com avatar usa flux-pulid, sem avatar usa flux-pro+LoRA
-  if(parsComAv.length===0){
-    // Nenhum personagem tem avatar — gera cena de capa genérica com LoRA
-    var nomeProt2=ST.personagens[0]?ST.personagens[0].nome:'a child';
-    var promptCapaGen='SQUISHBOOK_CHIBI Squishbook childrens book COVER ILLUSTRATION. '      +'A cute adorable chibi child protagonist named '+nomeProt2+' in a magical vibrant scene. '      +'SETTING: magical scene representing the story theme: '+roteiro2+'. '      +atmosferaCapa+'. '      +'The character is fully integrated into the background scene. '      +'Art style: Squishbook chibi kawaii, soft pastel watercolor, warm magical lighting, '      +'professional childrens book cover, vibrant colors, high quality. '      +'NO text, NO title, NO watermark.';    try{      var rCapaGen=await fetch('https://squishbook-backend-v2.onrender.com/api/avatar',{        method:'POST',headers:{'Content-Type':'application/json'},        body:JSON.stringify({model:'fal-ai/flux-pro',payload:{prompt:promptCapaGen,num_images:1,image_size:'portrait_4_3',loras:[{path:LORA_URL,scale:LORA_SCALE}]}})      });      var dCapaGen=await rCapaGen.json();      capaImageUrl=dCapaGen.images&&dCapaGen.images[0]&&dCapaGen.images[0].url;    }catch(e){ capaImageUrl=null; }  } else if(parsComAv.length>0){
-    var p0capa=parsComAv[0];
-    var descOutrosCapa=parsComAv.length>1
-      ? ' Together with another Squishbook chibi character '+parsComAv.slice(1).map(function(p){return '('+p.papel+' character)';}).join(' and ')+','
-      : '';
-    var qualRefCapaDesc=p0capa.papel==='protagonista'
-      ?'The reference image shows '+p0capa.nome+', the child protagonist. '
-      :'The reference image shows '+p0capa.nome+', the main character. ';
-    var promptCapa=qualRefCapaDesc
-      +'CHILDREN BOOK COVER. The character is centered in the image, facing the viewer, '
-      +'with a big joyful smile and arms open wide in a welcoming pose. '
-      +'PORTRAIT COMPOSITION: character fills the center and upper half of the image. '
-      +'BACKGROUND: a rich magical environment representing the story theme ('+roteiro2+'), '
-      +atmosferaCapa+'. Lush detailed background visible around the character. '
-      +'Art style: Squishbook chibi kawaii, soft pastel watercolor, warm magical lighting, '
-      +'professional childrens book cover, vibrant saturated colors, cinematic quality. '
-      +'Character fully integrated into background — no white box, no cutout, no border. '
-      +'NO text, NO title, NO watermark.';
+
+  // ── CAPA v4 (24/04/26): gerada com FLUX.2 [pro] edit, mesmo motor do miolo ──
+  // Unifica o estilo visual (aquarela chibi) entre capa e p\u00e1ginas internas.
+  // Usa foto ORIGINAL do protagonista como refer\u00eancia (n\u00e3o avatar chibi),
+  // porque FLUX.2 faz a transforma\u00e7\u00e3o chibi sozinho e resulta em qualidade superior.
+  var protCapa = ST.personagens[0];
+  if(protCapa && protCapa.fotoUrl){
     try{
-      var ctrlCapa=new AbortController();
-      var tmoutCapa=setTimeout(function(){ctrlCapa.abort();},75000);
-      var resCapa=await fetch('https://squishbook-backend-v2.onrender.com/api/avatar',{
-        method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({model:'fal-ai/flux-pulid',payload:{prompt:promptCapa,reference_image_url:p0capa.avatarUrl,num_images:1,image_size:'portrait_4_3',guidance_scale:3,num_inference_steps:30,loras:[{path:LORA_URL,scale:LORA_SCALE}]}}),
-        signal:ctrlCapa.signal
-      });
-      clearTimeout(tmoutCapa);
-      var dataCapa=await resCapa.json();
-      capaImageUrl=dataCapa.images&&dataCapa.images[0]&&dataCapa.images[0].url;
-    }catch(e){ capaImageUrl=null; }
+      // Converte foto original para data URL (reusa helper do miolo)
+      var fotoProtUrl = await fotoParaDataUrl(protCapa.fotoUrl);
+
+      if(fotoProtUrl){
+        // Descri\u00e7\u00e3o do protagonista com g\u00eanero/idade ancorados (mesmo padr\u00e3o do miolo)
+        var gfCapa = detectaGeneroFaixa(protCapa);
+        var tipoCapa = '';
+        if(gfCapa.faixa==='baby/toddler') tipoCapa = gfCapa.genero==='female' ? 'a baby girl' : 'a baby boy';
+        else if(gfCapa.faixa==='child') tipoCapa = gfCapa.genero==='female' ? 'a young girl' : 'a young boy';
+        else if(gfCapa.faixa==='teenager') tipoCapa = gfCapa.genero==='female' ? 'a teenage girl' : 'a teenage boy';
+        else tipoCapa = gfCapa.genero==='female' ? 'a young girl' : 'a young boy';
+
+        // Prompt de capa: composi\u00e7\u00e3o retrato, personagem centralizado, fundo tem\u00e1tico
+        var promptCapaV4 = 'Transform the person from @image1 into a chibi kawaii watercolor character for a children\'s book cover. '
+          + 'The character is ' + tipoCapa + ', preserve face and features exactly. '
+          + 'Portrait composition: character centered in the image, facing the viewer, '
+          + 'with a big joyful smile and arms open wide in a welcoming pose. '
+          + 'Character fills the center and upper half of the image. '
+          + 'Background: a rich magical environment fitting the theme of ' + roteiro2 + '. '
+          + atmosferaCapa + '. Lush detailed background visible around the character. '
+          + 'Soft pastel watercolor children\'s book illustration, chibi proportions with big glossy eyes and rosy cheeks, '
+          + 'professional book cover quality, vibrant saturated colors. '
+          + 'No text, no title, no watermark.';
+
+        var ctrlCapaV4 = new AbortController();
+        var tmoutCapaV4 = setTimeout(function(){ctrlCapaV4.abort();}, 150000);
+        var t0capa = Date.now();
+        var resCapaV4 = await fetch('https://squishbook-backend-v2.onrender.com/api/avatar',{
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({
+            model: MOTOR_V4,
+            payload: {
+              prompt: promptCapaV4,
+              image_urls: [fotoProtUrl],
+              image_size: 'portrait_4_3'
+            }
+          }),
+          signal: ctrlCapaV4.signal
+        });
+        clearTimeout(tmoutCapaV4);
+        var dataCapaV4 = await resCapaV4.json();
+        capaImageUrl = dataCapaV4.images && dataCapaV4.images[0] && dataCapaV4.images[0].url;
+
+        if(capaImageUrl){
+          logGeracao({tipo:'capa', status:'sucesso', modelo:MOTOR_V4, duracao_ms:Date.now()-t0capa, url_gerada:capaImageUrl});
+        } else {
+          logGeracao({tipo:'capa', status:'flux2_falhou', modelo:MOTOR_V4, duracao_ms:Date.now()-t0capa, erro_msg:'status '+resCapaV4.status});
+        }
+      }
+    }catch(e){
+      capaImageUrl = null;
+      logGeracao({tipo:'capa', status:'flux2_exception', erro_msg:(e && e.message) || String(e)});
+    }
   }
+
+  // Se n\u00e3o gerou (sem foto ou erro), PDF cai no fallback visual sem imagem de capa
+  // (capaImageUrl=null \u2192 cai no else do if(capaImageUrl) l\u00e1 embaixo)
 
   // ── Capa impactante ─────────────────────────────────────────────────────────
   var capaHtml;
