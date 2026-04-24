@@ -379,6 +379,27 @@ var LORA_URL = 'https://v3b.fal.media/files/b/0a93a99c/tK0lOZmDhul1GBBMhmCcM_pyt
 var LORA_SCALE = 0.9;
 var TRIGGER = 'SQUISHBOOK_CHIBI';
 
+// ════════════════════════════════════════════════════════════════════════════
+// SQUISHBOOK v4 (24/04/26): motor de imagem FLUX.2 multi-reference
+// ════════════════════════════════════════════════════════════════════════════
+// Após 1 mês de patches no pipeline pulid+composite sem conseguir resolver o
+// bug da Mamãe virar criança, migramos para fal-ai/flux-2-pro/edit, que aceita
+// múltiplas referências visuais nativamente. Validado em 6 testes no playground.
+// Arquitetura: 1 chamada com 2 fotos originais → cena pronta em estilo chibi.
+// Elimina: etapa de avatar chibi intermediário, composite manual, remoção de fundo.
+// Log completo: Notion 34c40f17-e82d-8130.
+var MOTOR_V4 = 'fal-ai/flux-2-pro/edit';
+var FOTO_MAX_PX = 1024; // Tamanho máximo de cada foto enviada ao FLUX.2 (1MP input)
+var CENARIOS_BLOQUEADOS = [
+  // Cenários que tendem a alucinar terceiro personagem em composições de 2 pessoas.
+  // Descobertos no Teste 4 e 4B (sofá + livro = 3 pessoas no resultado).
+  {regex:/\bsof[aá]\b|\bcouch\b/i, alternativo:'o ch\u00e3o da sala com almofadas'},
+  {regex:/mesa de jantar|dining table/i, alternativo:'o bal\u00e3o da cozinha com xic\u00e1ras'},
+  {regex:/cama de casal|king bed|queen bed/i, alternativo:'uma cama de solteiro aconchegante'},
+  {regex:/piquenique|picnic/i, alternativo:'um gramado com flores ao redor'}
+];
+// Fim do bloco v4
+
 // UUID leve para identificar a sessão de geração (usado no log server-side)
 var SESSAO_ID = 'sq-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2,8);
 
@@ -2270,6 +2291,155 @@ async function gerarDescricaoCenario(texto, titulo, roteiro){
   return r.cenario;
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// HELPERS v4 — motor FLUX.2 multi-reference
+// ════════════════════════════════════════════════════════════════════════════
+
+// Detecta gênero e faixa etária de um personagem a partir dos campos do cadastro.
+// Prioridade: campos explícitos (genero + faixaEtaria). Fallback: heurística por nome + papel.
+// Versão global, compartilhada entre helpers v4 e código legado interno.
+function detectaGeneroFaixa(p){
+  var g='', f='';
+  // gênero
+  if(p.genero==='masculino') g='male';
+  else if(p.genero==='feminino') g='female';
+  else {
+    var nomeL=(p.nome||'').toLowerCase();
+    var nomesFem=['ana','sofia','valentina','alice','julia','laura','isabela','maria','gabriela','beatriz','leticia','manuela','heloisa','camila','fernanda','clara','livia','vitoria','lorena','bruna','aline','paula','elisa','lara','luna','isis','maya','mia','mae','mamae','vovo','tia'];
+  var nomesMasc=['papai','pai','vovo','tio','avo'];
+    if(nomesFem.some(function(n){return nomeL.startsWith(n);})) g='female';
+    else if(nomesMasc.some(function(n){return nomeL.indexOf(n)>=0;})) g='male';
+    else if(nomeL.endsWith('a')) g='female';
+    else g='male';
+  }
+  // faixa etária
+  if(p.faixaEtaria==='bebe') f='baby/toddler';
+  else if(p.faixaEtaria==='crianca') f='child';
+  else if(p.faixaEtaria==='adolescente') f='teenager';
+  else if(p.faixaEtaria==='adulto') f='adult';
+  else if(p.faixaEtaria==='idoso') f='elderly';
+  else {
+    if(p.papel==='protagonista') f='child';
+    else if(p.papel==='familiar') f='adult';
+    else f='child';
+  }
+  return {genero: g, faixa: f};
+}
+
+// Converte blob: URL (upload do usuário) em data URL base64 redimensionada.
+// FLUX.2 aceita data URL diretamente em image_urls[], sem upload intermediário.
+async function fotoParaDataUrl(fotoUrl, maxPx){
+  if(!fotoUrl) return null;
+  var MAX = maxPx || FOTO_MAX_PX;
+  // Se já é data URL e está no tamanho certo, devolve como está
+  if(fotoUrl.indexOf('data:')===0) return fotoUrl;
+  try{
+    var blob = await fetch(fotoUrl).then(function(r){return r.blob();});
+    return await new Promise(function(res){
+      var img = new Image();
+      img.onload = function(){
+        var w = img.width, h = img.height;
+        if(w > MAX || h > MAX){
+          if(w > h){ h = Math.round(h * MAX / w); w = MAX; }
+          else { w = Math.round(w * MAX / h); h = MAX; }
+        }
+        var canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        res(canvas.toDataURL('image/jpeg', 0.9));
+      };
+      img.onerror = function(){ res(null); };
+      img.src = URL.createObjectURL(blob);
+    });
+  }catch(e){ return null; }
+}
+
+// Filtra cenário contra blacklist de composições que alucinam terceiro personagem.
+// Descoberto nos Testes 4 e 4B: sofá+livro vira 3 pessoas no FLUX.2.
+function filtrarCenarioV4(cenario, qtdPersonagens){
+  if(!cenario || qtdPersonagens < 2) return cenario;
+  for(var i=0; i<CENARIOS_BLOQUEADOS.length; i++){
+    var regra = CENARIOS_BLOQUEADOS[i];
+    if(regra.regex.test(cenario)){
+      // Substitui o termo perigoso pelo alternativo
+      return cenario.replace(regra.regex, regra.alternativo);
+    }
+  }
+  return cenario;
+}
+
+// Descrição enxuta de um personagem para o prompt FLUX.2.
+// NÃO hardcoda features físicas (barba/óculos/tatuagem) — FLUX.2 extrai da foto.
+// Apenas ancora idade e gênero explicitamente, que foi o que os 6 testes validaram.
+function descricaoPersonagemV4(p){
+  var gf = detectaGeneroFaixa(p);
+  var base = '';
+  if(gf.faixa==='baby/toddler') base = gf.genero==='female' ? 'a baby girl' : 'a baby boy';
+  else if(gf.faixa==='child') base = gf.genero==='female' ? 'a young girl' : 'a young boy';
+  else if(gf.faixa==='teenager') base = gf.genero==='female' ? 'a teenage girl' : 'a teenage boy';
+  else if(gf.faixa==='adult') base = gf.genero==='female' ? 'an adult woman' : 'an adult man';
+  else if(gf.faixa==='elderly') base = gf.genero==='female' ? 'an elderly woman' : 'an elderly man';
+  else base = gf.genero==='female' ? 'a female person' : 'a male person';
+
+  // Adiciona papel se for familiar/amigo (contexto que ajuda o modelo)
+  var papel = '';
+  if(p.papel==='familiar'){
+    if(gf.faixa==='adult' && gf.genero==='female') papel=' (a mother)';
+    else if(gf.faixa==='adult' && gf.genero==='male') papel=' (a father)';
+    else if(gf.faixa==='elderly' && gf.genero==='female') papel=' (a grandmother)';
+    else if(gf.faixa==='elderly' && gf.genero==='male') papel=' (a grandfather)';
+  }
+  return base + papel + ', preserve face and features exactly';
+}
+
+// Detecta se a cena precisa de reforço de escala (adulto + criança juntos).
+// Descoberto no Teste 3: sem reforço explícito, Mamãe vira adolescente em cenas dinâmicas.
+function reforcoEscalaV4(personagens){
+  if(personagens.length < 2) return '';
+  var gfs = personagens.map(detectaGeneroFaixa);
+  var temAdulto = gfs.some(function(g){return g.faixa==='adult' || g.faixa==='elderly';});
+  var temCrianca = gfs.some(function(g){return g.faixa==='child' || g.faixa==='baby/toddler';});
+  if(temAdulto && temCrianca){
+    return ' The adult has mature adult body proportions and is clearly taller than the child, who reaches only to the adult\'s waist or hip level.';
+  }
+  return '';
+}
+
+// Monta o prompt completo para o FLUX.2 [pro] edit.
+// Template validado nos Testes 1, 2, 5 e 6 (6/7 testes passaram; Teste 4B falhou por cenário).
+function construirPromptV4(parsNaPg, cenario, acao, expressao, roteiro, atmosfera){
+  // @image1 é sempre o protagonista; @image2 (se houver) é o secundário com foto
+  var refs = [];
+  var imagens = [];
+  for(var i=0; i<parsNaPg.length && i<2; i++){
+    var p = parsNaPg[i];
+    var tag = '@image' + (i+1);
+    refs.push(tag + ' is ' + descricaoPersonagemV4(p));
+    imagens.push(p); // usado depois para montar image_urls[]
+  }
+
+  var cenaTexto = '';
+  if(parsNaPg.length === 1){
+    cenaTexto = 'Transform the person from ' + refs[0].split(' is ')[0] + ' into a chibi kawaii watercolor character. ';
+    cenaTexto += acao + '. ';
+    cenaTexto += 'Setting: ' + cenario + '. ';
+    cenaTexto += refs[0] + '. ';
+  } else {
+    cenaTexto = 'Transform the people from @image1 and @image2 into chibi kawaii watercolor characters together in the same scene. ';
+    cenaTexto += 'Action: ' + acao + '. ';
+    cenaTexto += 'Setting: ' + cenario + '. ';
+    cenaTexto += refs.join('. ') + '. ';
+    cenaTexto += reforcoEscalaV4(parsNaPg);
+  }
+
+  cenaTexto += ' Full body visible for all characters, including legs and feet. ';
+  cenaTexto += 'Soft pastel watercolor children\'s book illustration, chibi proportions with big glossy eyes and rosy cheeks. ';
+  cenaTexto += atmosfera + '. ';
+  cenaTexto += 'No text, no watermark.';
+
+  return cenaTexto;
+}
+
 async function gerarCenaPaginaComRetry(pg, idx){
   // FIX BUG 3: 3 tentativas com backoff exponencial (2s, 5s, 10s)
   var delays=[2000, 5000, 10000];
@@ -2288,43 +2458,39 @@ async function gerarCenaPaginaComRetry(pg, idx){
       if(tentativa<2) await new Promise(function(r){setTimeout(r,delays[tentativa]);});
     }
   }
-  // FIX BUG 4: fallback final - se também falhar, marca como FALHA_FINAL
-  // Não entregar fallback genérico "faz de conta" como se fosse sucesso.
-  // O chamador deve bloquear a entrega do PDF quando erro=true.
-  try{
-    var textoFallback=pg.texto||pg.titulo||'';
-    var nomeProt=ST.personagens[0].nome||'o protagonista';
-    var promptFallback=TRIGGER+' Squishbook childrens book illustration. '
-      +'A cute chibi child character named '+nomeProt+' in a colorful storybook scene. '
-      +(textoFallback.substring(0,100)+'. ')
-      +'Art style: soft pastel watercolor, warm magical lighting, professional storybook illustration. '
-      +'NO text, NO watermark.';
-    var t0f=Date.now();
-    var rf=await fetch('https://squishbook-backend-v2.onrender.com/api/avatar',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'fal-ai/flux-pro',payload:{prompt:promptFallback,num_images:1,image_size:'landscape_4_3',loras:[{path:LORA_URL,scale:LORA_SCALE}]}}),
-    });
-    var df=await rf.json();
-    var urlF=df.images&&df.images[0]&&df.images[0].url;
-    if(urlF){
-      logGeracao({tipo:'cena',cena_idx:idx,status:'fallback_generico',duracao_ms:Date.now()-t0f,url_gerada:urlF});
-      // IMPORTANTE: mesmo com fallback ok, marca flag para o chamador saber que foi degradada
-      return {pg:pg,idx:idx,url:urlF,erro:false,fallback:true};
-    }
-    logGeracao({tipo:'cena',cena_idx:idx,status:'falha_final',duracao_ms:Date.now()-t0f,erro_msg:(df&&df.erro)||'sem imagem'});
-    return {pg:pg,idx:idx,url:null,erro:true};
-  }catch(e){
-    logGeracao({tipo:'cena',cena_idx:idx,status:'falha_final_exception',erro_msg:(e&&e.message)||''});
-    return {pg:pg,idx:idx,url:null,erro:true};
-  }
+  // v4 (24/04/26): fallback "flux-pro genérico" removido.
+  // Motivo: fallback sem foto gera protagonista aleatório (não parece com a criança),
+  // pior que entregar erro. Preferimos falhar honestamente para o chamador mostrar
+  // "tentar novamente" em vez de entregar cena degradada como sucesso.
+  logGeracao({tipo:'cena',cena_idx:idx,status:'falha_final_sem_fallback',erro_msg:'3 tentativas FLUX.2 falharam'});
+  return {pg:pg,idx:idx,url:null,erro:true};
 }
 
 async function gerarCenaPagina(pg,idx){
+  // ══════════════════════════════════════════════════════════════════════════
+  // SQUISHBOOK v4 (24/04/26): motor FLUX.2 [pro] edit multi-reference
+  // ══════════════════════════════════════════════════════════════════════════
+  // Input:  pg={titulo, texto}, idx=número da página
+  // Output: {pg, idx, url, erro} — URL da imagem gerada ou null com erro:true
+  //
+  // Pipeline:
+  //   1. Detectar quem aparece na página (preservado da v3)
+  //   2. Detectar expressão e ação conjunta (preservado da v3)
+  //   3. Extrair cenário via Claude (preservado da v3)
+  //   4. Filtrar cenário contra blacklist de composições perigosas (NOVO)
+  //   5. Converter fotos originais em data URLs (NOVO — substitui avatar chibi)
+  //   6. Montar prompt FLUX.2 com template validado nos 6 testes (NOVO)
+  //   7. Chamar fal-ai/flux-2-pro/edit via /api/avatar
+  //   8. Retornar {pg, idx, url, erro}
+  //
+  // Abandonado (vs v3): pipeline pulid+composite, gerarAvatarDalle como
+  // pré-requisito, removerFundoViaFal/Branco, compositeComRemocaoFundo.
+  // Tudo continua no arquivo como zona morta/fallback documentado.
+
   var parsNaPg=[];
   var textoCombinadoBusca=(pg.texto||'').toLowerCase()+' '+(pg.titulo||'').toLowerCase();
 
-  // Mapeamento de apelidos/variações para facilitar o match
-  // Cobre variações de escrita, acentuação e apelidos familiares
+  // Mapeamento de apelidos/variações (preservado da v3)
   var aliasMap={
     'papai':['papai','pai','papa','daddy','dad','o pai','o papai'],
     'mamae':['mamae','mamãe','mae','mãe','mama','mommy','mom','a mae','a mamae','mamãe'],
@@ -2338,8 +2504,6 @@ async function gerarCenaPagina(pg,idx){
     'padrinho':['padrinho','godfather','o padrinho'],
     'madrinha':['madrinha','godmother','a madrinha']
   };
-  // Também adiciona o primeiro nome de cada personagem como alias
-  // Ex: "Katia Takase" → busca por "katia" também
   var aliasExtra={};
   for(var ae=0;ae<ST.personagens.length;ae++){
     var pae=ST.personagens[ae];
@@ -2350,20 +2514,12 @@ async function gerarCenaPagina(pg,idx){
 
   for(var i=0;i<ST.personagens.length;i++){
     var p=ST.personagens[i];
-    if(p.papel==='protagonista'){ parsNaPg.push(p); continue; } // protagonista sempre aparece
+    if(p.papel==='protagonista'){ parsNaPg.push(p); continue; }
     if(!p.nome) continue;
-
-    // REGRA: familiar/amigo sempre aparecem (personagem central do livro)
-    // Só personagens do tipo "outro" precisam ser mencionados no texto para aparecer
-    if(p.papel==='familiar'||p.papel==='amigo'){
-      parsNaPg.push(p);
-      continue;
-    }
+    if(p.papel==='familiar'||p.papel==='amigo'){ parsNaPg.push(p); continue; }
 
     var nomeLower=p.nome.toLowerCase();
-    // Busca direta pelo nome
     var achouNome=textoCombinadoBusca.indexOf(nomeLower)>=0;
-    // Busca por aliases comuns
     if(!achouNome){
       for(var ak in aliasMap){
         if(nomeLower.indexOf(ak)>=0||ak.indexOf(nomeLower)>=0){
@@ -2375,7 +2531,6 @@ async function gerarCenaPagina(pg,idx){
         if(achouNome) break;
       }
     }
-    // Busca por primeiro nome (ex: "Katia" encontra "Katia Takase")
     if(!achouNome && aliasExtra[nomeLower]){
       var extAliases=aliasExtra[nomeLower];
       for(var xi=0;xi<extAliases.length;xi++){
@@ -2384,385 +2539,170 @@ async function gerarCenaPagina(pg,idx){
     }
     if(achouNome) parsNaPg.push(p);
   }
-  // Garante que protagonista está sempre presente
   if(parsNaPg.length===0) parsNaPg=[ST.personagens[0]];
-  // Remove duplicatas
   parsNaPg=parsNaPg.filter(function(p,i,arr){return arr.indexOf(p)===i;});
+
+  // ── Limite duro da v4: no máximo 2 personagens VISUAIS na cena ──────────
+  // Descoberto nos Testes 4/4B: 3+ personagens causa alucinação.
+  // Os demais viram "personagens narrativos" (só no texto) na Sessão 2.
+  // Por enquanto, cortamos em 2 e damos prioridade a protagonista + papel familiar.
+  if(parsNaPg.length > 2){
+    var prot = parsNaPg.filter(function(p){return p.papel==='protagonista';})[0] || parsNaPg[0];
+    var outros = parsNaPg.filter(function(p){return p !== prot;});
+    // Prioridade: familiar > amigo > outro
+    outros.sort(function(a,b){
+      var rank={familiar:0, amigo:1, outro:2};
+      return (rank[a.papel]||3) - (rank[b.papel]||3);
+    });
+    parsNaPg = [prot, outros[0]];
+  }
 
   var textoLower=(pg.texto||'').toLowerCase();
   var tituloLower=(pg.titulo||'').toLowerCase();
   var combinado=textoLower+' '+tituloLower;
   var roteiro=ST.roteiro||'aventura';
 
-  // Expressão por página baseada no texto
+  // Expressão por página (preservado da v3)
   var expressao='joyful and curious';
-  if(combinado.indexOf('assust')>-1||combinado.indexOf('medo')>-1||combinado.indexOf('tremeu')>-1) expressao='scared but brave, wide nervous eyes, tense posture';
-  else if(combinado.indexOf('triste')>-1||combinado.indexOf('chor')>-1) expressao='sad and emotional, teary eyes, slumped posture';
-  else if(combinado.indexOf('alegr')>-1||combinado.indexOf('feliz')>-1||combinado.indexOf('sorri')>-1||combinado.indexOf('rindo')>-1) expressao='very happy, big beaming smile, arms raised in joy';
-  else if(combinado.indexOf('corag')>-1||combinado.indexOf('heroi')>-1||combinado.indexOf('determin')>-1) expressao='brave and determined, fists clenched, strong confident pose';
-  else if(combinado.indexOf('surpres')>-1||combinado.indexOf('espant')>-1||combinado.indexOf('incrivel')>-1) expressao='amazed and surprised, mouth open wide, hands on cheeks';
-  else if(combinado.indexOf('dormi')>-1||combinado.indexOf('sonho')>-1) expressao='sleepy and dreamy, eyes half closed, floating gently';
-  else if(combinado.indexOf('corr')>-1||combinado.indexOf('brinc')>-1||combinado.indexOf('animado')>-1) expressao='excited and playful, running pose, arms spread wide';
-  else if(combinado.indexOf('abraco')>-1||combinado.indexOf('amor')>-1||combinado.indexOf('junto')>-1) expressao='warm and loving, open arms, glowing heart expression';
-  else if(combinado.indexOf('chorando')>-1||combinado.indexOf('lagrima')>-1) expressao='crying tears of joy, emotional smile, hand on heart';
-  if(roteiro==='terror') expressao='scared but curious, wide glowing eyes, trembling';
+  if(combinado.indexOf('assust')>-1||combinado.indexOf('medo')>-1||combinado.indexOf('tremeu')>-1) expressao='scared but brave, wide nervous eyes';
+  else if(combinado.indexOf('triste')>-1||combinado.indexOf('chor')>-1) expressao='sad and emotional, teary eyes';
+  else if(combinado.indexOf('alegr')>-1||combinado.indexOf('feliz')>-1||combinado.indexOf('sorri')>-1||combinado.indexOf('rindo')>-1) expressao='very happy, big beaming smile';
+  else if(combinado.indexOf('corag')>-1||combinado.indexOf('heroi')>-1||combinado.indexOf('determin')>-1) expressao='brave and determined';
+  else if(combinado.indexOf('surpres')>-1||combinado.indexOf('espant')>-1||combinado.indexOf('incrivel')>-1) expressao='amazed and surprised';
+  else if(combinado.indexOf('dormi')>-1||combinado.indexOf('sonho')>-1) expressao='sleepy and dreamy';
+  else if(combinado.indexOf('corr')>-1||combinado.indexOf('brinc')>-1) expressao='excited and playful';
+  else if(combinado.indexOf('abraco')>-1||combinado.indexOf('amor')>-1||combinado.indexOf('junto')>-1) expressao='warm and loving';
+  if(roteiro==='terror') expressao='scared but curious, wide glowing eyes';
 
-    // Ação conjunta entre personagens (quando 2+)
+  // Ação conjunta entre personagens (preservado da v3)
   var acaoConjunta='interacting naturally, physically close together in the scene';
   if(parsNaPg.length>=2){
-    if(combinado.indexOf('abraco')>-1||combinado.indexOf('abraca')>-1||combinado.indexOf('junto')>-1||combinado.indexOf('apertad')>-1) acaoConjunta='hugging each other tightly, faces close, very emotional';
-    else if(combinado.indexOf('corr')>-1||combinado.indexOf('brinc')>-1||combinado.indexOf('pula')>-1) acaoConjunta='running and jumping together, arms spread wide with joy';
-    else if(combinado.indexOf('assust')>-1||combinado.indexOf('medo')>-1||combinado.indexOf('tremeu')>-1) acaoConjunta='one holding the other protectively, both scared, looking at the threat';
-    else if(combinado.indexOf('descobr')>-1||combinado.indexOf('encontr')>-1||combinado.indexOf('olha')>-1) acaoConjunta='both pointing and looking at something with wide amazed eyes';
+    if(combinado.indexOf('abraco')>-1||combinado.indexOf('abraca')>-1||combinado.indexOf('junto')>-1||combinado.indexOf('apertad')>-1) acaoConjunta='hugging each other warmly, faces close, emotional and tender';
+    else if(combinado.indexOf('corr')>-1||combinado.indexOf('brinc')>-1||combinado.indexOf('pula')>-1) acaoConjunta='running and playing together, holding hands, arms wide with joy';
+    else if(combinado.indexOf('assust')>-1||combinado.indexOf('medo')>-1||combinado.indexOf('tremeu')>-1) acaoConjunta='one holding the other protectively, both scared';
+    else if(combinado.indexOf('descobr')>-1||combinado.indexOf('encontr')>-1||combinado.indexOf('olha')>-1) acaoConjunta='both pointing and looking at something together with wide amazed eyes';
     else if(combinado.indexOf('ajud')>-1||combinado.indexOf('segur')>-1||combinado.indexOf('mao')>-1) acaoConjunta='holding hands, one helping the other forward';
-    else if(combinado.indexOf('chora')>-1||combinado.indexOf('lagrima')>-1||combinado.indexOf('triste')>-1) acaoConjunta='one comforting the other with a gentle hand on shoulder, sad but caring';
-    else if(combinado.indexOf('celebr')>-1||combinado.indexOf('vitoria')>-1||combinado.indexOf('hurra')>-1||combinado.indexOf('feliz')>-1) acaoConjunta='both jumping with arms raised in celebration, huge smiles';
-    else if(combinado.indexOf('conversa')>-1||combinado.indexOf('fala')>-1||combinado.indexOf('diz')>-1) acaoConjunta='facing each other, one talking expressively, the other listening with big eyes';
-    else acaoConjunta='physically together, clearly interacting with each other, facing each other or touching';
+    else if(combinado.indexOf('chora')>-1||combinado.indexOf('lagrima')>-1||combinado.indexOf('triste')>-1) acaoConjunta='one comforting the other with a gentle hand on shoulder';
+    else if(combinado.indexOf('celebr')>-1||combinado.indexOf('vitoria')>-1||combinado.indexOf('feliz')>-1) acaoConjunta='both jumping with arms raised in celebration, huge smiles';
+    else if(combinado.indexOf('conversa')>-1||combinado.indexOf('fala')>-1||combinado.indexOf('diz')>-1) acaoConjunta='facing each other, one talking expressively, the other listening';
+    else acaoConjunta='physically together, clearly interacting, facing each other or touching';
+  } else {
+    acaoConjunta='in a dynamic pose fitting the scene, expressing ' + expressao;
   }
 
-  // Gera descrição do cenário via IA com base no texto real da página
-  // Extrai TUDO via Claude: cenário + objetos narrativos + ação específica + personagens presentes
+  // Extrai cenário via Claude (preservado da v3)
   var elementos = await extrairElementosDaCena(pg.texto||'', pg.titulo||'', roteiro, parsNaPg);
-  var cenario = elementos.cenario;
+  var cenario = elementos.cenario || 'a storybook scene';
 
-  // FIX BUG 7: validação estrita - filtra nomes inventados do personagensPresentes
-  // O Claude às vezes alucina terceiro personagem. Aqui remove qualquer nome que
-  // NÃO existe no cadastro, antes de usar a lista.
-  var nomesCadastrados = parsNaPg.map(function(p){return (p.nome||'').toLowerCase().split(' ')[0];}).filter(function(n){return n;});
-  if(elementos.personagensPresentes && elementos.personagensPresentes.length>0){
-    var nomesValidos = elementos.personagensPresentes.filter(function(n){
-      var nLower = (n||'').toLowerCase();
-      return nomesCadastrados.some(function(cad){
-        return nLower.indexOf(cad)>=0 || cad.indexOf(nLower)>=0;
-      });
-    });
-    elementos.personagensPresentes = nomesValidos;
-
-    // Agora refina parsNaPg (protagonista sempre fica) - usando só nomes validados
-    if(nomesValidos.length>0){
-      var nomesPresentes=nomesValidos.map(function(n){return n.toLowerCase();});
-      var refinado=parsNaPg.filter(function(p){
-        if(p.papel==='protagonista') return true;
-        var primNome=(p.nome||'').toLowerCase().split(' ')[0];
-        for(var np=0;np<nomesPresentes.length;np++){
-          if(nomesPresentes[np].indexOf(primNome)>=0||primNome.indexOf(nomesPresentes[np])>=0) return true;
-        }
-        return false;
-      });
-      if(refinado.length>0) parsNaPg=refinado;
-    }
+  // Filtra cenário contra blacklist (NOVO v4)
+  var cenarioOriginal = cenario;
+  cenario = filtrarCenarioV4(cenario, parsNaPg.length);
+  if(cenario !== cenarioOriginal){
+    logGeracao({tipo:'cena',cena_idx:idx,status:'cenario_filtrado_v4',erro_msg:'de: '+cenarioOriginal.substring(0,80)+' -> para: '+cenario.substring(0,80)});
   }
 
-  // Monta string de objetos narrativos para injetar nos prompts
-  var objetosStr='';
+  // Adiciona objetos narrativos ao cenário, se houver
   if(elementos.objetos && elementos.objetos.length>0){
-    objetosStr=' ALSO IN SCENE (non-character objects): '+elementos.objetos.map(function(o){return o.descricao;}).join('; ')+'.';
+    cenario += '. Also in scene: ' + elementos.objetos.map(function(o){return o.descricao;}).join('; ');
   }
 
-  // Ação específica retornada pela Claude (sobrescreve acaoConjunta quando disponível)
-  var acaoEspecifica = elementos.acao && elementos.acao.length>10 ? elementos.acao : acaoConjunta;
-
-  // FIX #1 (22/04): negative_prompt NATIVO do fal-pulid (mais forte que texto no positivo).
-  // Mantemos uma versão curta no positivo só para anti-alucinação de personagens
-  // (que funciona melhor como regra positiva); o resto vai no negative_prompt nativo.
-  var negativeExtra = ' AVOID: extra characters not listed, invented children, random people, duplicate character, stuffed toy drawn as human person, teddy bear rendered as a child.';
-
-  // Negative prompt nativo — será passado como parâmetro `negative_prompt` do fal-pulid/flux.
-  // Começa com regras base anti-artefato; regras de idade são acrescentadas abaixo só
-  // quando a cena tem mistura adulto+criança (evita penalizar cenas de 1 criança sozinha).
-  var negativePromptFal = 'low quality, blurry, distorted, deformed, ugly, bad anatomy, extra limbs, mutated hands, '
-    + 'text, watermark, signature, logo, letters, words, '
-    + 'dirty face, smudges on face, stains on cheeks, green marks on skin, brown spots on face, '
-    + 'white background cutout, pasted-on look, collage artifact, floating characters, '
-    + 'duplicate character, cloned faces, multiple protagonists';
-
-  // FIX BUG 5: detecta gênero+idade de CADA personagem individualmente.
-  // Antes só o protagonista tinha generoRef, causando Papai virar criança.
-  function detectaGeneroFaixa(p){
-    var g='', f='';
-    // gênero
-    if(p.genero==='masculino') g='male';
-    else if(p.genero==='feminino') g='female';
-    else {
-      var nomeL=(p.nome||'').toLowerCase();
-      var nomesFem=['ana','sofia','valentina','alice','julia','laura','isabela','maria','gabriela','beatriz','leticia','manuela','heloisa','camila','fernanda','clara','livia','vitoria','lorena','bruna','aline','paula','elisa','lara','luna','isis','maya','mia','mae','mamae','vovo','tia'];
-      var nomesMasc=['papai','pai','vovo','tio','avo'];
-      if(nomesFem.some(function(n){return nomeL.startsWith(n);})) g='female';
-      else if(nomesMasc.some(function(n){return nomeL.indexOf(n)>=0;})) g='male';
-      else if(nomeL.endsWith('a')) g='female';
-      else g='male';
-    }
-    // faixa etária
-    if(p.faixaEtaria==='bebe') f='baby/toddler';
-    else if(p.faixaEtaria==='crianca') f='child';
-    else if(p.faixaEtaria==='adolescente') f='teenager';
-    else if(p.faixaEtaria==='adulto') f='adult';
-    else if(p.faixaEtaria==='idoso') f='elderly';
-    else {
-      // Inferência pelo papel
-      if(p.papel==='protagonista') f='child';
-      else if(p.papel==='familiar') f='adult';
-      else f='child';
-    }
-    return {genero: g, faixa: f};
-  }
-
-  // generoRef mantido só para o protagonista (compatibilidade com prompts de 1 avatar)
-  var generoRef='';
-  var proto0=parsNaPg.filter(function(p){return p.papel==='protagonista';})[0]||parsNaPg[0];
-  if(proto0){
-    var gfProto = detectaGeneroFaixa(proto0);
-    if(gfProto.genero==='male' && gfProto.faixa==='child') generoRef='BOY child character, male, masculine features. ';
-    else if(gfProto.genero==='female' && gfProto.faixa==='child') generoRef='GIRL child character, female, feminine features. ';
-    else if(gfProto.genero==='male') generoRef='MALE '+gfProto.faixa+' character, masculine features. ';
-    else generoRef='FEMALE '+gfProto.faixa+' character, feminine features. ';
-  }
-
-  // descricaoPorPersonagem: array com descrição detalhada por personagem (usado para cenas multi-char)
-  var descricaoPorPersonagem = parsNaPg.map(function(p){
-    var gf = detectaGeneroFaixa(p);
-    var tipo = gf.genero+' '+gf.faixa;
-    var papel = '';
-    if(p.papel==='protagonista') papel='main child protagonist';
-    else if(p.papel==='familiar'){
-      if(gf.faixa==='adult' && gf.genero==='female') papel='adult mother/female parent';
-      else if(gf.faixa==='adult' && gf.genero==='male') papel='adult father/male parent';
-      else if(gf.faixa==='elderly' && gf.genero==='female') papel='elderly grandmother';
-      else if(gf.faixa==='elderly' && gf.genero==='male') papel='elderly grandfather';
-      else papel='family member ('+tipo+')';
-    } else papel='companion character ('+tipo+')';
-    return {nome: p.nome, tipo: tipo, papel: papel, genero: gf.genero, faixa: gf.faixa};
-  });
-
-  // FIX BUG 5 adicional: se cena tem adulto/idoso junto com criança, reforça negativo
-  // pra evitar que o modelo renderize o adulto como criança (bug recorrente do pulid).
-  var temAdulto = descricaoPorPersonagem.some(function(d){return d.faixa==='adult' || d.faixa==='elderly' || d.faixa==='teenager';});
-  var temCrianca = descricaoPorPersonagem.some(function(d){return d.faixa==='child' || d.faixa==='baby/toddler';});
-  // FIX #1 (22/04): regra de idade vai pro negative_prompt NATIVO do fal-pulid
-  // (sinal mais forte que texto enfiado no positivo). Mantemos reforço mínimo no
-  // positivo pra balancear, mas a carga pesada fica no negative_prompt.
-  var reforcoIdadePositivo = '';
-  if(temAdulto && temCrianca){
-    negativePromptFal += ', adult rendered as child, father as boy, mother as girl, '
-      + 'grandmother as girl, grandfather as boy, baby rendered as adult, '
-      + 'all characters same height, all characters same age, '
-      + 'adults with child proportions, adults with small body, adults shrunk to child size, '
-      + 'teen rendered as child, teenager as baby';
-    reforcoIdadePositivo = ' AGE HIERARCHY: adults are visibly taller than children (adult head reaches much higher), '
-      + 'adults have mature adult bodies (broader shoulders, longer limbs, adult face shape), '
-      + 'children are visibly smaller, elderly characters have gray/white hair and mature features, '
-      + 'babies are small and held or supported.';
-  }
-
-
-  // Atmosfera
+  // Atmosfera por roteiro (preservado da v3)
   var atmosfera;
-  if(roteiro==='terror') atmosfera='dark spooky horror mood, deep shadows, eerie cold purple moonlight, creepy mist, dramatic horror lighting, dark purples and cold blues, cute but scary atmosphere';
-  else if(roteiro==='aventura') atmosfera='epic adventurous mood, dramatic golden hour lighting, heroic energy, warm golds and rich blues';
-  else if(roteiro==='magia') atmosfera='magical enchanted mood, soft glowing sparkles, ethereal light, dreamy pastel mist';
-  else if(roteiro==='familia') atmosfera='warm cozy family mood, soft golden indoor lighting, heartwarming and tender feeling';
-  else if(roteiro==='amizade') atmosfera='joyful cheerful mood, bright colorful lighting, playful and fun energy';
-  else if(roteiro==='animal') atmosfera='warm natural mood, soft sunlight through trees, gentle peaceful outdoor feeling';
-  else if(roteiro==='sonho') atmosfera='dreamy hopeful mood, soft ethereal lighting, floating clouds, gentle pastel glow';
-  else atmosfera='warm magical storybook mood, soft colorful lighting, joyful feeling';
+  if(roteiro==='terror') atmosfera='spooky mood, deep shadows, eerie moonlight, cute but slightly scary atmosphere';
+  else if(roteiro==='aventura') atmosfera='adventurous mood, dramatic golden hour lighting';
+  else if(roteiro==='magia') atmosfera='magical enchanted mood, soft glowing sparkles, dreamy pastel mist';
+  else if(roteiro==='familia') atmosfera='warm cozy family mood, soft golden indoor lighting';
+  else if(roteiro==='amizade') atmosfera='joyful cheerful mood, bright colorful lighting';
+  else if(roteiro==='animal') atmosfera='warm natural mood, soft sunlight through trees';
+  else if(roteiro==='sonho') atmosfera='dreamy hopeful mood, soft ethereal lighting, gentle pastel glow';
+  else atmosfera='warm magical storybook mood, soft colorful lighting';
 
-  // Personagens com avatarUrl disponíveis para usar como referência
-  var parsComAvatar=parsNaPg.filter(function(p){return p.avatarUrl;});
-  var parsSeAvatar=parsNaPg.filter(function(p){return !p.avatarUrl;});
+  // ── Converter fotos originais em data URLs ─────────────────────────────
+  // FLUX.2 aceita data URL em image_urls[]. Sem upload intermediário.
+  var imageUrls = [];
+  for(var k=0; k<parsNaPg.length; k++){
+    var pk = parsNaPg[k];
+    // Prioridade: foto original > avatar chibi já gerado
+    var fonte = pk.fotoUrl || pk.avatarUrl;
+    if(!fonte){
+      logGeracao({tipo:'cena',cena_idx:idx,status:'sem_foto',erro_msg:'personagem '+pk.nome+' sem fotoUrl nem avatarUrl'});
+      continue;
+    }
+    var dataUrl = await fotoParaDataUrl(fonte);
+    if(dataUrl) imageUrls.push(dataUrl);
+  }
+
+  if(imageUrls.length === 0){
+    logGeracao({tipo:'cena',cena_idx:idx,status:'sem_referencias',erro_msg:'nenhum personagem com foto valida'});
+    return {pg:pg, idx:idx, url:null, erro:true};
+  }
+
+  // ── Montar prompt FLUX.2 ───────────────────────────────────────────────
+  var prompt = construirPromptV4(parsNaPg, cenario, acaoConjunta, expressao, roteiro, atmosfera);
+
+  // ── Chamar FLUX.2 [pro] edit ───────────────────────────────────────────
+  var ctrl = new AbortController();
+  var tmout = setTimeout(function(){ctrl.abort();}, 150000); // 150s (backend tem retry 3x de 120s cada)
+  var t0 = Date.now();
 
   try{
-    var cenaUrl=null;
-
-    if(parsComAvatar.length===0){
-      // ── Nenhum avatar: gera cena completa com flux/schnell ──────────────────
-      var descs=parsNaPg.map(function(p,i){return descreverPersonagemParaPrompt(p,expressao,i===0);}).join(' and ');
-      var prompt='Squishbook childrens book illustration. '
-        +generoRef
-        +'ACTION: '+acaoEspecifica+'. '
-        +'CHARACTERS: '+descs+'. '
-        +'SETTING: '+cenario+'.'+objetosStr+' '
-        +atmosfera+'. '
-        +reforcoIdadePositivo
-        +'Art style: soft pastel watercolor, warm magical lighting, professional storybook illustration, '
-        +'chibi kawaii characters fully integrated into the background scene, no white background, no cutouts.'
-        +negativeExtra
-        +' NO text, NO watermark.';
-      var r1=await fetch('https://squishbook-backend-v2.onrender.com/api/avatar',{
-        method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({model:'fal-ai/flux-pro',payload:{prompt:TRIGGER+' '+prompt,negative_prompt:negativePromptFal,num_images:1,image_size:'landscape_4_3',loras:[{path:LORA_URL,scale:LORA_SCALE}]}})
-      });
-      var d1=await r1.json();
-      cenaUrl=d1.images&&d1.images[0]&&d1.images[0].url;
-
-    } else if(parsComAvatar.length===1){
-      // ── 1 avatar disponível: flux-pulid para máxima fidelidade ─────────────
-      var p0=parsComAvatar[0];
-      var gfP0 = detectaGeneroFaixa(p0);
-      // Descreve quem é o personagem de referência COM gênero e idade explícitos
-      var qualPersonagem = p0.papel==='protagonista'
-        ? 'the '+gfP0.genero+' '+gfP0.faixa+' protagonist named '+p0.nome
-        : 'the '+gfP0.genero+' '+gfP0.faixa+' ('+p0.papel+') named '+p0.nome;
-
-      // FIX BUG 5: para personagens SEM avatar, descrever explicitamente com gênero+idade
-      // para o modelo não desenhar todos como crianças.
-      var secundarios = parsNaPg.filter(function(px){return px!==p0;});
-      var descSecExplicita = secundarios.map(function(px){
-        var gf = detectaGeneroFaixa(px);
-        var desc = descreverPersonagemParaPrompt(px,expressao,false);
-        var roleDesc='';
-        if(px.papel==='familiar' && gf.faixa==='adult' && gf.genero==='female') roleDesc='adult woman (mother)';
-        else if(px.papel==='familiar' && gf.faixa==='adult' && gf.genero==='male') roleDesc='adult man (father)';
-        else if(px.papel==='familiar' && gf.faixa==='elderly' && gf.genero==='female') roleDesc='elderly woman (grandmother)';
-        else if(px.papel==='familiar' && gf.faixa==='elderly' && gf.genero==='male') roleDesc='elderly man (grandfather)';
-        else roleDesc=gf.genero+' '+gf.faixa;
-        return 'named '+px.nome+': '+roleDesc+' ('+desc+')';
-      }).join('; AND ');
-      var nomesSec2 = secundarios.map(function(px){return px.nome;}).join(' and ');
-
-      var prompt2=''
-        +'ACTION: '+acaoEspecifica+'. '
-        +'SETTING: '+cenario+'.'+objetosStr+' '
-        +atmosfera+'. '
-        +'CHARACTER 1 (reference photo): '+qualPersonagem+'. '
-        +(descSecExplicita?'CHARACTER 2 (draw from description, DIFFERENT from character 1): '+descSecExplicita+'. MUST be visible in scene. ':'')
-        +(parsNaPg.length>=2?'CRITICAL: Characters have DIFFERENT ages and genders as described above. Do NOT make them look the same. ':'')
-        +reforcoIdadePositivo
-        +'Squishbook chibi kawaii art style, soft pastel watercolor, warm magical lighting, professional childrens book illustration. '
-        +'Characters fully visible from head to toe, chibi proportions, integrated into background.'
-        +negativeExtra
-        +' NO text, NO watermark.';
-      var ctrl2=new AbortController();
-      // FIX #4 (22/04): timeout 120s → 150s. O backend tem retry de 3x com
-      // backoff (timeout inicial 90s), se o frontend aborta em 120s o retry
-      // do backend é cortado e cai no composite estático. 150s dá margem.
-      var tmout2=setTimeout(function(){ctrl2.abort();},150000);
-      var t0cena=Date.now();
-      var r2=await fetch('https://squishbook-backend-v2.onrender.com/api/avatar',{
-        method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({model:'fal-ai/flux-pulid',payload:{prompt:TRIGGER+' '+prompt2,negative_prompt:negativePromptFal,reference_image_url:p0.avatarUrl,num_images:1,image_size:'landscape_4_3',guidance_scale:7,num_inference_steps:30,loras:[{path:LORA_URL,scale:LORA_SCALE}]}}),
-        signal:ctrl2.signal
-      });
-      clearTimeout(tmout2);
-      var d2=await r2.json();
-      cenaUrl=d2.images&&d2.images[0]&&d2.images[0].url;
-      if(!r2.ok || !cenaUrl){
-        logGeracao({tipo:'cena',cena_idx:idx,status:'pulid_falhou',modelo:'fal-ai/flux-pulid',duracao_ms:Date.now()-t0cena,erro_msg:(d2.erro||'status '+r2.status+' '+JSON.stringify(d2).substring(0,200))});
-      }
-
-      // Fallback: se flux-pulid falhou, usa composite manual com remoção de fundo
-      if(!cenaUrl){
-        var bgPrompt='Squishbook childrens book background, NO characters, NO people. SETTING: '+cenario+'. '+atmosfera+'. Wide angle, soft pastel watercolor, warm magical lighting. NO text, NO characters.';
-        var rb=await fetch('https://squishbook-backend-v2.onrender.com/api/avatar',{
-          method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({model:'fal-ai/flux-pro',payload:{prompt:bgPrompt,num_images:1,image_size:'landscape_4_3',loras:[{path:LORA_URL,scale:LORA_SCALE}]}})
-        });
-        var db=await rb.json();
-        var bgUrl=db.images&&db.images[0]&&db.images[0].url;
-        if(bgUrl) cenaUrl=await compositeComRemocaoFundo(bgUrl,[p0],parsNaPg.length);
-      }
-
-    } else {
-      // ── 2+ avatares: usa pulid para o protagonista + composite para os demais ──
-      var prot2=parsComAvatar.filter(function(p){return p.papel==='protagonista';})[0]||parsComAvatar[0];
-      var gfProt2 = detectaGeneroFaixa(prot2);
-      var outros2=parsComAvatar.filter(function(p){return p!==prot2;});
-
-      // FIX BUG 5: descreve cada personagem secundário com gênero+idade explícitos
-      var descOutros2 = outros2.length>0
-        ? outros2.map(function(p){
-            var gf = detectaGeneroFaixa(p);
-            var desc = descreverPersonagemParaPrompt(p,expressao,false);
-            var roleDesc = gf.genero+' '+gf.faixa;
-            if(p.papel==='familiar' && gf.faixa==='adult' && gf.genero==='female') roleDesc='adult woman (mother)';
-            else if(p.papel==='familiar' && gf.faixa==='adult' && gf.genero==='male') roleDesc='adult man (father)';
-            else if(p.papel==='familiar' && gf.faixa==='elderly' && gf.genero==='female') roleDesc='elderly woman (grandmother)';
-            else if(p.papel==='familiar' && gf.faixa==='elderly' && gf.genero==='male') roleDesc='elderly man (grandfather)';
-            return 'named '+p.nome+': '+roleDesc+' ('+desc+')';
-          }).join('; AND ')
-        : '';
-      var descSemAv2 = parsSeAvatar.length>0
-        ? parsSeAvatar.map(function(p){
-            var gf = detectaGeneroFaixa(p);
-            var desc = descreverPersonagemParaPrompt(p,expressao,false);
-            var roleDesc = gf.genero+' '+gf.faixa;
-            if(p.papel==='familiar' && gf.faixa==='adult' && gf.genero==='female') roleDesc='adult woman (mother)';
-            else if(p.papel==='familiar' && gf.faixa==='adult' && gf.genero==='male') roleDesc='adult man (father)';
-            else if(p.papel==='familiar' && gf.faixa==='elderly' && gf.genero==='female') roleDesc='elderly woman (grandmother)';
-            else if(p.papel==='familiar' && gf.faixa==='elderly' && gf.genero==='male') roleDesc='elderly man (grandfather)';
-            return 'named '+p.nome+': '+roleDesc+' ('+desc+')';
-          }).join('; AND ')
-        : '';
-
-      var qualProt2 = prot2.papel==='protagonista'
-        ? 'the '+gfProt2.genero+' '+gfProt2.faixa+' protagonist named '+prot2.nome
-        : 'the '+gfProt2.genero+' '+gfProt2.faixa+' ('+prot2.papel+') named '+prot2.nome;
-
-      var promptMulti=''
-        +'ACTION: '+acaoEspecifica+'. '
-        +'SETTING: '+cenario+'.'+objetosStr+' '
-        +atmosfera+'. '
-        +'CHARACTER 1 (reference photo): '+qualProt2+'. '
-        +(descOutros2?'CHARACTER 2 (draw from description, DIFFERENT age/gender from character 1): '+descOutros2+'. MUST be visible. ':'')
-        +(descSemAv2?'ADDITIONAL CHARACTERS (draw from description): '+descSemAv2+'. ':'')
-        +'CRITICAL: Each character has DIFFERENT age and gender as described. Do NOT make them all look the same. '
-        +reforcoIdadePositivo
-        +'Squishbook chibi kawaii art style, soft pastel watercolor, warm magical lighting, professional childrens book illustration. '
-        +'Characters fully visible from head to toe, chibi proportions, integrated into background.'
-        +negativeExtra
-        +' NO text, NO watermark.';
-      var ctrlM=new AbortController();
-      // FIX #4 (22/04): 120s → 150s (idem pulid 1-avatar).
-      var tmoutM=setTimeout(function(){ctrlM.abort();},150000);
-      var t0multi=Date.now();
-      try{
-        var rM=await fetch('https://squishbook-backend-v2.onrender.com/api/avatar',{
-          method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({model:'fal-ai/flux-pulid',payload:{prompt:TRIGGER+' '+promptMulti,negative_prompt:negativePromptFal,reference_image_url:prot2.avatarUrl,num_images:1,image_size:'landscape_4_3',guidance_scale:7,num_inference_steps:30,loras:[{path:LORA_URL,scale:LORA_SCALE}]}}),
-          signal:ctrlM.signal
-        });
-        clearTimeout(tmoutM);
-        var dM=await rM.json();
-        cenaUrl=dM.images&&dM.images[0]&&dM.images[0].url;
-        if(!rM.ok || !cenaUrl){
-          logGeracao({tipo:'cena',cena_idx:idx,status:'pulid_multi_falhou',modelo:'fal-ai/flux-pulid',duracao_ms:Date.now()-t0multi,erro_msg:(dM.erro||'status '+rM.status)});
+    var resp = await fetch('https://squishbook-backend-v2.onrender.com/api/avatar', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model: MOTOR_V4,
+        payload: {
+          prompt: prompt,
+          image_urls: imageUrls,
+          image_size: 'landscape_4_3'
         }
-      }catch(e){
-        clearTimeout(tmoutM);
-        cenaUrl=null;
-        logGeracao({tipo:'cena',cena_idx:idx,status:'pulid_multi_exception',modelo:'fal-ai/flux-pulid',duracao_ms:Date.now()-t0multi,erro_msg:(e&&e.message)||''});
-      }
+      }),
+      signal: ctrl.signal
+    });
+    clearTimeout(tmout);
 
-      // Fallback: composite puro se pulid falhou
-      if(!cenaUrl){
-      // Gera cenário base
-      var bgPrompt2='Squishbook childrens book background illustration, NO characters, NO people, NO children. '
-        +'SETTING: '+cenario+'. '+atmosfera+'. '
-        +'Wide angle view showing the full environment. '
-        +'Art style: soft pastel watercolor, warm magical lighting, professional storybook illustration.';
-      var rb2=await fetch('https://squishbook-backend-v2.onrender.com/api/avatar',{
-        method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({model:'fal-ai/flux-pro',payload:{prompt:bgPrompt2,num_images:1,image_size:'landscape_4_3',loras:[{path:LORA_URL,scale:LORA_SCALE}]}})
+    var data = await resp.json();
+    var cenaUrl = data.images && data.images[0] && data.images[0].url;
+
+    if(!resp.ok || !cenaUrl){
+      logGeracao({
+        tipo:'cena', cena_idx:idx, status:'flux2_falhou', modelo:MOTOR_V4,
+        duracao_ms:Date.now()-t0,
+        erro_msg: (data.erro || 'status '+resp.status+' '+JSON.stringify(data).substring(0,200))
       });
-      var db2=await rb2.json();
-      var bgUrl2=db2.images&&db2.images[0]&&db2.images[0].url;
-      if(!bgUrl2) return {pg:pg,idx:idx,url:null,erro:true};
-
-      // Usa os avatarUrls já gerados no passo de revisão — sem regerar, preserva fidelidade
-      var avatarsParaCompor=parsComAvatar.map(function(pav){
-        return {avatarUrl:pav.avatarUrl,papel:pav.papel};
-      });
-
-      cenaUrl=await compositeComRemocaoFundo(bgUrl2, avatarsParaCompor, parsNaPg.length);
-      } // fecha fallback composite
+      return {pg:pg, idx:idx, url:null, erro:true};
     }
 
-    return {pg:pg,idx:idx,url:cenaUrl||null,erro:!cenaUrl};
+    logGeracao({
+      tipo:'cena', cena_idx:idx, status:'sucesso', modelo:MOTOR_V4,
+      duracao_ms:Date.now()-t0, url_gerada:cenaUrl
+    });
+    return {pg:pg, idx:idx, url:cenaUrl, erro:false};
+
   }catch(e){
-    console.error('Erro cena '+idx,e&&e.message?e.message:e);
-    return {pg:pg,idx:idx,url:null,erro:true};
+    clearTimeout(tmout);
+    console.error('Erro cena '+idx, e && e.message ? e.message : e);
+    logGeracao({
+      tipo:'cena', cena_idx:idx, status:'flux2_exception', modelo:MOTOR_V4,
+      duracao_ms:Date.now()-t0,
+      erro_msg:(e && e.message) || String(e)
+    });
+    return {pg:pg, idx:idx, url:null, erro:true};
   }
 }
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// ZONA MORTA v3 — funções abaixo não são mais chamadas pela gerarCenaPagina v4
+// ════════════════════════════════════════════════════════════════════════════
+// Mantidas no arquivo como fallback de emergência caso seja necessário rollback
+// para o pipeline pulid+composite. Não remover sem confirmação do Marcelo.
+// Log da virada arquitetural: Notion 34c40f17-e82d-8130.
+//
+// - removerFundoViaFal: usava fal-ai/birefnet-v2 para remover fundo dos avatares
+// - removerFundoBranco: fallback manual com flood fill
+// - compositeComRemocaoFundo: colava avatares sobre cenário vazio
+// ════════════════════════════════════════════════════════════════════════════
 
 // FIX #5 (22/04): remoção de fundo profissional via fal-ai/birefnet-v2.
 // Elimina as manchas verdes/marrons nos rostos do Beni que apareciam quando
