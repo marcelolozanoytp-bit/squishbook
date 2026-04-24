@@ -1429,34 +1429,45 @@ async function gerarAvatarDalle(p){
       + 'high quality childrens book illustration. '
       + 'NO text, NO watermark, NO background glow, NO circular border.';
   } else {
-    prompt = 'Squishbook style chibi character, FULL BODY from head to feet visible, centered in frame. '
-      + 'ABSOLUTE RULE: HUMAN CHARACTER ONLY - never an animal, never has fur, never has animal features. '
-      + 'This is a real human person turned into an adorable chibi illustration. '
-      + 'MANDATORY: show the COMPLETE character including head, torso, arms, legs and feet. DO NOT crop. '
+    // v4.2: prompt reescrito para FLUX.2 multi-reference.
+    // Mantido o essencial: descri\u00e7\u00e3o com idade/g\u00eanero + expres\u00e3o + fundo branco.
+    // Estilo mudado de "plush doll" para "watercolor" (unifica com livro).
+    prompt = 'Transform the person from @image1 into a chibi kawaii watercolor character for a children\'s book. '
+      + 'Full body portrait, centered in frame, from head to feet visible. '
       + descFisica
-      + 'CRITICAL: carefully observe the reference photo and copy: '
-      + 'exact hair color and texture (dark, light, curly, straight, long, short), '
-      + 'skin tone (fair, medium, dark), eye color, face shape, '
-      + 'facial hair if present (beard, stubble), any other distinctive features. '
-      + 'The character MUST be immediately recognizable as the same person from the photo. '
-      + expressao + '. '
-      + 'Squishbook art style: ultra soft squishy human plush doll character, '
-      + 'oversized glossy eyes with sparkle highlights, chubby round human face, rosy cheeks, tiny button nose, '
-      + 'big head small body chibi proportions, short stubby legs visible, '
-      + cor + ' clothing and accent colors, '
-      + 'soft pastel shading with gentle gradients, PURE WHITE BACKGROUND only, NO glow, NO halo, NO circular frame, NO vignette, NO gradient background. '
-      + 'full body portrait, high quality digital illustration, professional childrens book style. '
-      + 'HUMAN ONLY - strictly no animal features, no fur, no snout, no claws, no tail. '
-      + 'NO text, NO watermark, NO cropping, NO circular border, NO background glow.';
+      + 'Preserve face, hair, skin tone and distinctive features exactly from the reference photo. '
+      + 'Expression: ' + expressao + '. '
+      + 'Soft pastel watercolor children\'s book illustration, chibi proportions with big glossy eyes and rosy cheeks. '
+      + cor + ' clothing and accent colors. '
+      + 'PURE WHITE BACKGROUND only, no glow, no gradient, no border. '
+      + 'No text, no watermark.';
   }
 
   try{
-    var model = (!ehPet && imageUrl) ? 'fal-ai/flux-pulid' : 'fal-ai/flux-pro';
-    var body = (!ehPet && imageUrl)
-      ? {prompt:TRIGGER+' '+prompt, reference_image_url:imageUrl, num_images:1, image_size:'square_hd', guidance_scale:12, num_inference_steps:30, loras:[{path:LORA_URL,scale:LORA_SCALE}]}
-      : {prompt:TRIGGER+' '+prompt, num_images:1, image_size:'square_hd', loras:[{path:LORA_URL,scale:LORA_SCALE}]};
+    // v4.2 (24/04/26): migrado pulid → FLUX.2 [pro] edit para unificar estilo
+    // entre avatar (etapa 5) e p\u00e1ginas do livro. Mesma est\u00e9tica aquarela chibi.
+    // Pets continuam em flux-pro puro (sem foto de refer\u00eancia).
+    var model, body;
+    if(!ehPet && imageUrl){
+      // Humano com foto: FLUX.2 multi-reference (1 foto \u00e9 v\u00e1lido)
+      model = MOTOR_V4;
+      body = {
+        prompt: prompt,
+        image_urls: [imageUrl],
+        image_size: 'square_hd'
+      };
+    } else {
+      // Pet ou sem foto: fallback em flux-pro puro
+      model = 'fal-ai/flux-pro';
+      body = {
+        prompt: TRIGGER+' '+prompt,
+        num_images: 1,
+        image_size: 'square_hd',
+        loras: [{path:LORA_URL, scale:LORA_SCALE}]
+      };
+    }
     var ctrl=new AbortController();
-    var tmout=setTimeout(function(){ctrl.abort();},45000);
+    var tmout=setTimeout(function(){ctrl.abort();}, ehPet ? 45000 : 120000);
     var res = await fetch('https://squishbook-backend-v2.onrender.com/api/avatar', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
