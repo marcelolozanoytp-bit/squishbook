@@ -391,12 +391,28 @@ var TRIGGER = 'SQUISHBOOK_CHIBI';
 var MOTOR_V4 = 'fal-ai/flux-2-pro/edit';
 var FOTO_MAX_PX = 1024; // Tamanho máximo de cada foto enviada ao FLUX.2 (1MP input)
 var CENARIOS_BLOQUEADOS = [
-  // Cenários que tendem a alucinar terceiro personagem em composições de 2 pessoas.
-  // Descobertos no Teste 4 e 4B (sofá + livro = 3 pessoas no resultado).
-  {regex:/\bsof[aá]\b|\bcouch\b/i, alternativo:'o ch\u00e3o da sala com almofadas'},
-  {regex:/mesa de jantar|dining table/i, alternativo:'o bal\u00e3o da cozinha com xic\u00e1ras'},
+  // Cen\u00e1rios que tendem a alucinar terceiro personagem em composi\u00e7\u00f5es de 2 pessoas.
+  // Descobertos nos Testes 4 e 4B (23/04) e teste Beni+Papai (24/04).
+  // Abordagem: substituir o gatilho por uma alternativa com menos \"ancoragem visual clich\u00ea\".
+
+  // Bloco 1: m\u00f3veis que convidam composi\u00e7\u00e3o familiar cl\u00e1ssica (sof\u00e1+livro = 4 pessoas)
+  {regex:/\bsof[a\u00e1]\b|\bcouch\b/i, alternativo:'o ch\u00e3o da sala com almofadas'},
+  {regex:/mesa de jantar|dining table/i, alternativo:'o bal\u00e3o da cozinha com x\u00edcaras'},
   {regex:/cama de casal|king bed|queen bed/i, alternativo:'uma cama de solteiro aconchegante'},
-  {regex:/piquenique|picnic/i, alternativo:'um gramado com flores ao redor'}
+  {regex:/piquenique|picnic/i, alternativo:'um gramado com flores ao redor'},
+
+  // Bloco 2 (Sess\u00e3o 3, 24/04): cen\u00e1rios que induzem m\u00faltiplas crian\u00e7as.
+  // Bug descoberto no teste \"Beni e o Amigo Invis\u00edvel\" (p\u00e1gina 5 gerou menina fantasma na cama ao fundo).
+  {regex:/quarto infantil|quarto das crian\u00e7as|nursery|kids room|children'?s bedroom/i, alternativo:'um quarto simples com uma cama e uma janela'},
+  {regex:/sala com brinquedos|playroom|sala de brincar/i, alternativo:'o gramado do jardim com flores'},
+  {regex:/parque infantil|playground|parquinho/i, alternativo:'uma trilha com \u00e1rvores e flores'},
+  {regex:/escola|sala de aula|classroom|school/i, alternativo:'uma biblioteca calma'},
+  {regex:/festa de anivers\u00e1rio|birthday party/i, alternativo:'uma mesa com bolo e presentes'},
+  {regex:/creche|day ?care|kindergarten/i, alternativo:'uma sala aconchegante com livros'},
+
+  // Bloco 3: cen\u00e1rios muito detalhados que o modelo preenche com pessoas
+  {regex:/pra\u00e7a\b|\bpublic square/i, alternativo:'um caminho entre \u00e1rvores'},
+  {regex:/shopping|mall|centro comercial/i, alternativo:'uma loja aconchegante com prateleiras coloridas'}
 ];
 // Fim do bloco v4
 
@@ -2271,6 +2287,7 @@ async function extrairElementosDaCena(texto, titulo, roteiro, personagensCadastr
       +'- objetos: ONLY include things that are NOT registered characters but ARE visually important in this scene (toys, creatures, imaginary monsters, magical items, shadows described as characters). Leave empty [] if nothing relevant.\n'
       +'- If the text mentions a "monster", "shadow", "creature" that is actually imaginary or a misperception (revealed later as just a shadow), still describe it visually for THIS scene.\n'
       +'- acao: describe what is happening visually in THIS specific scene using action verbs. This is the most important field.\n'
+      +'- cenario: CRITICAL: describe ONLY the physical environment (architecture, furniture, nature, lighting). NEVER describe or imply other people, children, visitors, bystanders, crowds, classmates, or families in the environment. If the original text mentions a "kids room" or "classroom" or "party", describe only the physical objects (beds, desks, decorations) without implying other people are there. The scene must feel like the empty environment that the registered characters will enter. Keep it simple: max 20 words.\n'
       +'- All text values (cenario, tipo, descricao, acao) must be in English. Only "nome" stays in Portuguese.\n';
 
     var res=await fetch('https://squishbook-backend-v2.onrender.com/api/historia',{
@@ -2435,15 +2452,21 @@ function construirPromptV4(parsNaPg, cenario, acao, expressao, roteiro, atmosfer
     cenaTexto += acao + '. ';
     cenaTexto += 'Setting: ' + cenario + '. ';
     cenaTexto += refs[0] + '. ';
+    // Sess\u00e3o 3 (24/04): constraint positivo de quantidade exata.
+    // Afirma\u00e7\u00e3o funciona melhor que nega\u00e7\u00e3o em modelos de difus\u00e3o.
+    cenaTexto += 'The illustration shows exactly one character, alone in the scene, with an empty and clean background around them. ';
   } else {
     cenaTexto = 'Transform the people from @image1 and @image2 into chibi kawaii watercolor characters together in the same scene. ';
     cenaTexto += 'Action: ' + acao + '. ';
     cenaTexto += 'Setting: ' + cenario + '. ';
     cenaTexto += refs.join('. ') + '. ';
     cenaTexto += reforcoEscalaV4(parsNaPg);
+    // Sess\u00e3o 3 (24/04): constraint positivo para evitar personagem fantasma.
+    // Descoberto no teste Beni+Papai (p\u00e1gina 5 gerou menina na cama ao fundo).
+    cenaTexto += ' The illustration shows exactly these two characters together, alone in the scene, with an empty and clean background around them. ';
   }
 
-  cenaTexto += ' Full body visible for all characters, including legs and feet. ';
+  cenaTexto += 'Full body visible for all characters, including legs and feet. ';
   cenaTexto += 'Soft pastel watercolor children\'s book illustration, chibi proportions with big glossy eyes and rosy cheeks. ';
   cenaTexto += atmosfera + '. ';
   cenaTexto += 'No text, no watermark.';
