@@ -52,27 +52,115 @@
   ]
 }
 </script>
-<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Baloo+2:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Baloo+2:wght@400;600;700;800&family=Fraunces:opsz,wght@9..144,400;9..144,700;9..144,900&display=swap" rel="stylesheet"/>
 <style>
-:root{--azul:#378ADD;--azul-esc:#185FA5;--azul-deep:#0C447C;--azul-cl:#B5D4F4;--azul-pal:#E6F1FB;--roxo:#AFA9EC;--roxo-esc:#7F77DD;--rosa:#ED93B1;--rosa-esc:#D4537E;--verde:#1D9E75;--texto:#1a1a2e;--texto-sec:#5a5a7a;--cinza:#f7fafd;--borda:#dbeeff;--erro:#e24b4a}
+/* v4-cosmetico (26/04): paleta refeita para alinhar com a landing nova.
+   Vari\u00e1veis antigas (--azul, --azul-esc, etc.) viram aliases das novas
+   para n\u00e3o quebrar refer\u00eancias inline espalhadas no c\u00f3digo. */
+:root{
+  /* PALETA NOVA (sincronizada com index.html) */
+  --roxo:#7C3AED;
+  --roxo-cl:#EDE9FE;
+  --roxo-esc:#5B21B6;
+  --rosa-coral:#FF6B9D;
+  --rosa-cl:#FFE4ED;
+  --rosa-esc:#E8527A;
+  --amarelo:#FFCD3C;
+  --verde:#10B981;
+  --creme:#FFFBF5;
+  --branco:#FFFFFF;
+  --texto:#180F2E;
+  --texto-sec:#6B5E8A;
+  --borda:#EDE8F8;
+  --erro:#e24b4a;
+
+  /* ALIASES (mant\u00eam c\u00f3digo legado funcionando) */
+  --azul:var(--roxo);
+  --azul-esc:var(--roxo-esc);
+  --azul-deep:var(--roxo-esc);
+  --azul-cl:var(--roxo-cl);
+  --azul-pal:var(--roxo-cl);
+  --rosa:var(--rosa-coral);
+  --cinza:var(--creme);
+}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Nunito',sans-serif;color:var(--texto);background:var(--cinza);min-height:100vh}
-.header{background:linear-gradient(135deg,#0C447C,#185FA5,#7F77DD);padding:14px 28px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100;box-shadow:0 4px 20px rgba(12,68,124,.3)}
-.header-logo{font-family:'Baloo 2',cursive;font-size:1.3rem;font-weight:800;color:white;text-decoration:none}
-.header-logo span{color:rgba(255,255,255,.55);font-weight:300}
+body{font-family:'Nunito',sans-serif;color:var(--texto);background:var(--creme);min-height:100vh}
+
+/* BANNER DIA DAS M\u00c3ES (igual landing) */
+.banner-topo{
+  background:linear-gradient(135deg,#FF6B9D 0%,#E8527A 50%,#7C3AED 100%);
+  color:white;padding:10px 24px;text-align:center;
+  font-weight:700;font-size:.88rem;letter-spacing:.2px;
+  position:relative;z-index:201;
+}
+.banner-topo strong{font-weight:900;color:#FFCD3C}
+.banner-topo .countdown{
+  display:inline-block;background:rgba(255,255,255,.18);
+  padding:2px 10px;border-radius:20px;margin-left:8px;font-weight:800;
+}
+@media(max-width:640px){
+  .banner-topo{font-size:.74rem;padding:8px 12px}
+  .banner-topo .countdown{display:block;margin:4px auto 0;width:fit-content}
+}
+
+/* HEADER novo: creme com logo gradiente */
+.header{
+  background:rgba(255,251,245,.96);
+  backdrop-filter:blur(20px);
+  padding:14px 28px;
+  display:flex;align-items:center;gap:16px;
+  position:sticky;top:0;z-index:100;
+  border-bottom:1px solid rgba(124,58,237,.08);
+}
+.header-logo{
+  font-family:'Baloo 2',cursive;font-size:1.5rem;font-weight:900;
+  text-decoration:none;letter-spacing:-.5px;
+  background:linear-gradient(135deg,var(--roxo),var(--rosa-coral));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.header-logo span{color:rgba(124,58,237,.4);font-weight:300;-webkit-text-fill-color:rgba(124,58,237,.4)}
+
+/* PROGRESS STEPS */
 .progress-wrap{flex:1;display:flex;justify-content:center}
 .progress-steps{display:flex;align-items:center;gap:4px}
 .ps{display:flex;align-items:center;gap:4px}
-.ps-dot{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:800;border:2px solid rgba(255,255,255,.3);color:rgba(255,255,255,.6);background:rgba(255,255,255,.1);transition:all .3s}
-.ps-dot.active{background:white;border-color:white;color:var(--azul-deep)}
+.ps-dot{
+  width:30px;height:30px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:.76rem;font-weight:800;
+  border:2px solid var(--borda);color:var(--texto-sec);background:white;
+  transition:all .3s;
+}
+.ps-dot.active{
+  background:linear-gradient(135deg,var(--rosa-coral),var(--roxo));
+  border-color:var(--roxo);color:white;
+  box-shadow:0 4px 12px rgba(124,58,237,.32);
+}
 .ps-dot.done{background:var(--verde);border-color:var(--verde);color:white}
-.ps-line{width:18px;height:2px;background:rgba(255,255,255,.2);border-radius:2px;transition:background .3s}
+.ps-line{width:18px;height:2px;background:var(--borda);border-radius:2px;transition:background .3s}
 .ps-line.done{background:var(--verde)}
+
 .main{max-width:720px;margin:0 auto;padding:40px 20px 80px}
-.card{background:#fff;border-radius:24px;padding:40px 44px;border:1.5px solid var(--borda);animation:slideIn .35s cubic-bezier(.34,1.2,.64,1) both;box-shadow:0 4px 24px rgba(12,68,124,.07)}
+.card{
+  background:white;border-radius:24px;
+  padding:40px 44px;
+  border:1px solid var(--borda);
+  animation:slideIn .35s cubic-bezier(.34,1.2,.64,1) both;
+  box-shadow:0 4px 30px rgba(124,58,237,.06);
+}
 @keyframes slideIn{from{opacity:0;transform:translateY(18px) scale(.98)}to{opacity:1;transform:none}}
-.slabel{font-size:.73rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--azul);margin-bottom:8px}
-.stit{font-family:'Baloo 2',cursive;font-size:1.5rem;font-weight:800;color:var(--azul-deep);margin-bottom:8px;line-height:1.25}
+
+/* T\u00cdTULOS DAS ETAPAS */
+.slabel{
+  font-size:.72rem;font-weight:800;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--rosa-coral);margin-bottom:10px;
+}
+.stit{
+  font-family:'Fraunces',serif;font-weight:900;
+  font-size:1.85rem;letter-spacing:-.8px;line-height:1.15;
+  color:var(--texto);margin-bottom:10px;
+}
+.sdesc{font-size:.98rem;color:var(--texto-sec);line-height:1.6;margin-bottom:24px}
 .sdesc{font-size:.95rem;color:var(--texto-sec);line-height:1.65;margin-bottom:26px}
 
 /* PERSONAGENS */
@@ -262,14 +350,15 @@ textarea:focus,input:focus{border-color:var(--azul)}
 
 /* BOTOES */
 .btn-row{display:flex;gap:12px;margin-top:26px;flex-wrap:wrap}
-.btn{padding:15px 30px;border-radius:50px;font-family:'Baloo 2',cursive;font-size:1rem;font-weight:700;cursor:pointer;border:none;transition:transform .18s,box-shadow .18s,opacity .18s;display:inline-flex;align-items:center;gap:8px;text-decoration:none}
+.btn{padding:15px 30px;border-radius:50px;font-family:'Baloo 2',cursive;font-size:1rem;font-weight:800;cursor:pointer;border:none;transition:transform .2s,box-shadow .2s,opacity .2s;display:inline-flex;align-items:center;gap:8px;text-decoration:none;letter-spacing:.2px}
 .btn:hover:not(:disabled){transform:translateY(-2px) scale(1.02)}
 .btn:disabled{opacity:.45;cursor:not-allowed}
-.btn-primary{background:linear-gradient(135deg,var(--azul-esc),var(--roxo-esc));color:#fff;box-shadow:0 6px 20px rgba(24,95,165,.28);flex:1;justify-content:center}
-.btn-primary:hover:not(:disabled){box-shadow:0 10px 28px rgba(24,95,165,.38)}
+.btn-primary{background:linear-gradient(135deg,var(--rosa-coral),var(--roxo));color:#fff;box-shadow:0 8px 24px rgba(232,82,122,.35);flex:1;justify-content:center}
+.btn-primary:hover:not(:disabled){box-shadow:0 12px 32px rgba(232,82,122,.45)}
 .btn-secondary{background:#fff;color:var(--texto-sec);border:2px solid var(--borda);flex-shrink:0}
-.btn-secondary:hover:not(:disabled){border-color:var(--azul-cl);color:var(--azul-esc)}
-.btn-sucesso{background:linear-gradient(135deg,var(--verde),#0F6E56);color:#fff;box-shadow:0 6px 20px rgba(29,158,117,.28);flex:1;justify-content:center}
+.btn-secondary:hover:not(:disabled){border-color:var(--roxo);color:var(--roxo)}
+.btn-sucesso{background:linear-gradient(135deg,var(--verde),#0F6E56);color:#fff;box-shadow:0 8px 24px rgba(29,158,117,.35);flex:1;justify-content:center}
+.btn-sucesso:hover:not(:disabled){box-shadow:0 12px 32px rgba(29,158,117,.45)}
 .erro-msg{background:#fcebeb;border:1.5px solid #f09595;border-radius:10px;padding:11px 15px;font-size:.86rem;color:var(--erro);margin-top:10px;display:none}
 .erro-msg.show{display:block}
 .sucesso-wrap{text-align:center;padding:16px 0}
@@ -355,6 +444,13 @@ textarea:focus,input:focus{border-color:var(--azul)}
 <script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 </head>
 <body>
+
+<!-- Banner topo Dia das M\u00e3es (sincronizado com landing) -->
+<div class="banner-topo">
+  \u2728 <strong>ESPECIAL DIA DAS M\u00c3ES</strong> \u2014 33% OFF de lan\u00e7amento at\u00e9 10 de maio
+  <span class="countdown" id="countdownCriar">\u23f0 Faltam 14 dias</span>
+</div>
+
 <header class="header">
   <a href="index.html" class="header-logo">Squish<span>book</span></a>
   <div class="progress-wrap">
@@ -365,6 +461,21 @@ textarea:focus,input:focus{border-color:var(--azul)}
   <div class="card" id="cardContent"></div>
 </main>
 <script>
+// Countdown sincronizado com a landing
+(function(){
+  function tick(){
+    var diaDasMaes = new Date('2026-05-10T23:59:59');
+    var dias = Math.max(0, Math.floor((diaDasMaes - new Date()) / 86400000));
+    var el = document.getElementById('countdownCriar');
+    if(el){
+      if(dias > 1) el.textContent = '\u23f0 Faltam ' + dias + ' dias';
+      else if(dias === 1) el.textContent = '\u23f0 Falta 1 dia!';
+      else el.textContent = '\ud83c\udf89 \u00c9 hoje!';
+    }
+  }
+  tick();
+  setInterval(tick, 60000);
+})();
 var PRECO_EXTRA = 9.90;
 var MAX_REGEN = 3;
 var nextId = 2;
@@ -484,6 +595,7 @@ var PEMAPC = {protagonista:'STAR',familiar:'HRT',amigo:'HAND',pet:'PAW',outro:'S
 var PCORES = {protagonista:'#378ADD',familiar:'#D4537E',amigo:'#7F77DD',pet:'#1D9E75',outro:'#E8893C'};
 
 var ROTEIROS = [
+  {id:'diadasmaes',emoji:'HRT',ec:'\u{1F490}',t:'Especial Dia das M\u00e3es',d:'Hist\u00f3ria emocionante m\u00e3e e filho',destaque:true},
   {id:'aventura',emoji:'MAP',ec:'\u{1F5FA}',t:'Grande Aventura',d:'Jornada epica cheia de surpresas'},
   {id:'amizade',emoji:'HAND',ec:'\u{1F91D}',t:'Amigos Para Sempre',d:'Uma historia de amizade'},
   {id:'familia',emoji:'HRT',ec:'\u2764',t:'Familia Unida',d:'O amor que une a familia'},
@@ -494,11 +606,12 @@ var ROTEIROS = [
 ];
 
 var FORMATOS = [
-  {id:'digital',ec:'\u{1F4F1}',t:'Digital',d:'PDF por email. Pronto em minutos!',p:79,dest:false,paginas:6},
-  {id:'impresso',ec:'\u{1F4D7}',t:'Impresso',d:'Livro fisico com 12 cenas. Entregue em casa!',p:159,dest:true,paginas:12}
+  {id:'digital',ec:'\u{1F4F1}',t:'Digital',d:'PDF por email. Pronto em minutos!',p:39,dest:false,paginas:6},
+  {id:'impresso',ec:'\u{1F4D7}',t:'Impresso',d:'Em breve! Livro f\u00edsico com 12 cenas, entregue em casa.',p:159,dest:true,paginas:12,emBreve:true}
 ];
 
 var PG_EC = {
+  diadasmaes:['\u{1F33C}','\u{1F490}','\u{1F495}','\u2728','\u{1F970}','\u{1F970}'],
   aventura:['\u{1F305}','\u{1F5FA}','\u26A1','\u{1F3C6}','\u{1F31F}','\u{1F31F}'],
   amizade:['\u{1F338}','\u{1F91D}','\u{1F494}','\u{1F308}','\u2764','\u2764'],
   familia:['\u{1F3E0}','\u2764','\u{1F381}','\u2728','\u{1F970}','\u{1F970}'],
@@ -544,9 +657,12 @@ function render(){
 
 // S1: PERSONAGENS + IDADE
 function s1(c){
-  c.innerHTML = '<div class="slabel">Passo 1 de 6</div>'
+  c.innerHTML = '<div class="slabel">Passo 1 de 5</div>'
     + '<h2 class="stit">Personagens e idade</h2>'
-    + '<p class="sdesc">Adicione os personagens e a idade da crianca. Os 4 primeiros sao gratis. <strong style="color:var(--rosa-esc)">A partir do 5\u00ba: R$ '+fmtMoney(PRECO_EXTRA)+' por personagem extra.</strong></p>'
+    + '<p class="sdesc">Adicione os personagens e a idade da crian\u00e7a.</p>'
+    + '<div style="background:linear-gradient(135deg,#FFF6FA,#FFFBF5);border:1.5px solid #FFD6E3;border-radius:14px;padding:14px 16px;margin-bottom:18px;font-size:.92rem;line-height:1.5;color:#7C3AED">'
+    + '<strong>\u{1F4A1} Como funciona:</strong> at\u00e9 <strong>2 personagens com foto</strong> v\u00e3o aparecer ilustrados nas p\u00e1ginas do livro. Outros personagens podem ser mencionados no texto.'
+    + '</div>'
     + '<div class="idade-box">'
     + '<label class="campo-label">\u{1F382} Quantos anos a crianca tem?</label>'
     + '<div class="idade-row">'
@@ -765,51 +881,35 @@ function av1(){
 
 // S2: TIPO + ESTILO
 function s2(c){
-  var rotWD = ST.tipoHistoria==='roteiro'?'block':'none';
-  var persWD = ST.tipoHistoria==='personalizada'?'block':'none';
-  var estiloD = ST.tipoHistoria?'block':'none';
+  // v4-simplificado (26/04): removido escolha entre "tema pronto" e "hist\u00f3ria personalizada"
+  // (era complexo demais e gerava bugs). Removido tamb\u00e9m escolha de estilo visual/narrativo
+  // (decidido automaticamente pela idade via atualizarHint na tela 1).
+  // Resultado: tela vira apenas grid de 8 roteiros para escolher.
+  // Garante valores default caso usu\u00e1rio venha de uma sess\u00e3o anterior
+  if(!ST.tipoHistoria) ST.tipoHistoria='roteiro';
+  if(!ST.estiloFinal){
+    ST.estiloFinal = (parseInt(ST.idadeCrianca)||6) <= 7 ? 'visual' : 'narrativo';
+  }
+
   var rotCards='';
   for(var i=0;i<ROTEIROS.length;i++){
     var r=ROTEIROS[i];
     var sel=ST.roteiro===r.id?' selected':'';
-    rotCards+='<div class="rot-card'+sel+'" onclick="selRot(\''+r.id+'\')"><span class="rot-emoji">'+r.ec+'</span><h4>'+r.t+'</h4><p>'+r.d+'</p></div>';
+    var destaque=r.destaque?'<span class="badge-novo-tema" style="position:absolute;top:-9px;left:50%;transform:translateX(-50%);background:#FF6B9D;color:white;padding:3px 10px;border-radius:50px;font-weight:900;font-size:.65rem;letter-spacing:.3px;white-space:nowrap;box-shadow:0 3px 10px rgba(232,82,122,.3)">\u{1F33C} NOVO</span>':'';
+    rotCards+='<div class="rot-card'+sel+(r.destaque?' destaque-rot':'')+'" onclick="selRot(\''+r.id+'\')" style="position:relative">'+destaque+'<span class="rot-emoji">'+r.ec+'</span><h4>'+r.t+'</h4><p>'+r.d+'</p></div>';
   }
-  var autoBadge=ST.estiloAuto?'<span class="estilo-auto-badge">\u2728 Sugerido para '+ST.idadeCrianca+' anos</span>':'';
-  var vsel=ST.estiloFinal==='visual'?' selected':'';
-  var nsel=ST.estiloFinal==='narrativo'?' selected':'';
-  var op1=ST.tipoHistoria==='roteiro'?' selected':'';
-  var op2=ST.tipoHistoria==='personalizada'?' selected':'';
 
-  c.innerHTML='<div class="slabel">Passo 2 de 6</div>'
-    +'<h2 class="stit">Que tipo de historia?</h2>'
-    +'<p class="sdesc">Escolha o tema e o estilo do livro para <strong>'+ST.personagens[0].nome+'</strong>.</p>'
-    +'<div class="opcoes">'
-    +'<div class="opcao'+op1+'" onclick="selTipo(\'roteiro\')"><div class="opcao-icon">\u{1F4DA}</div><div class="opcao-info"><h4>Tema pronto</h4><p>Escolha entre 7 temas incriveis!</p></div></div>'
-    +'<div class="opcao'+op2+'" onclick="selTipo(\'personalizada\')"><div class="opcao-icon">\u270F\uFE0F</div><div class="opcao-info"><h4>Contar uma historia real</h4><p>A IA transforma em livro magico!</p></div></div>'
-    +'</div>'
-    +'<div id="rotWrap" style="display:'+rotWD+'"><div class="roteiros">'+rotCards+'</div></div>'
-    +'<div id="persWrap" style="display:'+persWD+';margin-top:18px">'
-    +'<label class="campo-label">Conte o que aconteceu \u{1F4AC}</label>'
-    +'<textarea placeholder="Ex: A vovo Maria sempre leva a Sofia ao parque. Um dia encontraram um passarinho machucado e cuidaram juntos ate ele voar de volta. A Sofia ficou tao feliz que chorou. Descreva com detalhes: onde foi, o que aconteceu, como cada um reagiu, o que fez aquele momento especial..." maxlength="2000" oninput="ST.historiaConta=this.value;document.getElementById(\'cnt\').textContent=this.value.length+\'/2000\'">'+ST.historiaConta+'</textarea>'
-    +'<div class="contador" id="cnt">'+ST.historiaConta.length+'/2000</div>'
-    +'</div>'
-    +'<div class="estilo-wrap" id="estiloWrap" style="display:'+estiloD+'">'
-    +'<div class="estilo-titulo">Estilo do livro '+autoBadge+'</div>'
-    +'<div class="estilo-cards">'
-    +'<div class="estilo-card visual'+vsel+'" onclick="selEstilo(\'visual\')"><span class="estilo-emoji">\u{1F3A8}</span><h4>Mais ilustracoes</h4><p>Frases curtinhas, imagens grandes. Ideal ate 7 anos.</p><span class="badge-visual">\u{1F4D6} Visual</span></div>'
-    +'<div class="estilo-card narrativo'+nsel+'" onclick="selEstilo(\'narrativo\')"><span class="estilo-emoji">\u{1F4DD}</span><h4>Mais texto</h4><p>Enredo completo, 3 capitulos. Ideal para 8+ anos.</p><span class="badge-narrativo">\u{1F4DA} Narrativo</span></div>'
-    +'</div></div>'
-    +'<div class="erro-msg" id="erroT">Complete sua escolha para continuar.</div>'
+  c.innerHTML='<div class="slabel">Passo 2 de 5</div>'
+    +'<h2 class="stit">Escolha o tema</h2>'
+    +'<p class="sdesc">Selecione o universo do livro de <strong>'+ST.personagens[0].nome+'</strong>.</p>'
+    +'<div class="roteiros">'+rotCards+'</div>'
+    +'<div class="erro-msg" id="erroT">Escolha um tema para continuar.</div>'
     +'<div class="btn-row"><button class="btn btn-secondary" onclick="voltar()">\u2190 Voltar</button><button class="btn btn-primary" onclick="av2()">Continuar \u2192</button></div>';
 }
 
 function selTipo(t){
+  // mantida para n\u00e3o quebrar refer\u00eancias antigas mas n\u00e3o \u00e9 mais chamada
   ST.tipoHistoria=t;
-  document.getElementById('rotWrap').style.display=t==='roteiro'?'block':'none';
-  document.getElementById('persWrap').style.display=t==='personalizada'?'block':'none';
-  document.getElementById('estiloWrap').style.display='block';
-  var ops=document.querySelectorAll('.opcao');
-  for(var i=0;i<ops.length;i++) ops[i].classList.toggle('selected',(i===0&&t==='roteiro')||(i===1&&t==='personalizada'));
 }
 function selRot(id){
   ST.roteiro=id;
@@ -818,39 +918,38 @@ function selRot(id){
   event.currentTarget.classList.add('selected');
 }
 function selEstilo(e){
+  // mantida para n\u00e3o quebrar refer\u00eancias antigas mas n\u00e3o \u00e9 mais chamada
   ST.estiloFinal=e;
-  var ec=document.querySelectorAll('.estilo-card');
-  for(var i=0;i<ec.length;i++) ec[i].classList.remove('selected');
-  event.currentTarget.classList.add('selected');
 }
 function av2(){
   var err=document.getElementById('erroT');
-  if(!ST.tipoHistoria){err.textContent='Escolha uma opcao.';err.classList.add('show');return;}
-  if(ST.tipoHistoria==='roteiro'&&!ST.roteiro){err.textContent='Escolha um tema.';err.classList.add('show');return;}
-  if(ST.tipoHistoria==='personalizada'&&ST.historiaConta.trim().length<30){err.textContent='Conte um pouco mais (minimo 20 caracteres).';err.classList.add('show');return;}
-  if(!ST.estiloFinal){err.textContent='Escolha o estilo do livro.';err.classList.add('show');return;}
+  if(!ST.roteiro){err.textContent='Escolha um tema.';err.classList.add('show');return;}
+  // Garante estilo definido (defesa em profundidade)
+  if(!ST.estiloFinal){
+    ST.estiloFinal = (parseInt(ST.idadeCrianca)||6) <= 7 ? 'visual' : 'narrativo';
+  }
+  if(!ST.tipoHistoria) ST.tipoHistoria='roteiro';
   ST.step=3; render();
 }
 
 // S3: DETALHES
 function s3(c){
   var nome = ST.personagens[0].nome||'a crianca';
-  c.innerHTML='<div class="slabel">Passo 3 de 6</div>'
-    +'<h2 class="stit">Ultimos detalhes \u2728</h2>'
-    +'<p class="sdesc">Essas informacoes deixam a historia unica e especial para <strong>'+nome+'</strong>.</p>'
+  c.innerHTML='<div class="slabel">Passo 3 de 5</div>'
+    +'<h2 class="stit">Quem est\u00e1 dando o presente? \u2728</h2>'
+    +'<p class="sdesc">Vai aparecer na contracapa do livro de <strong>'+nome+'</strong>.</p>'
     +'<div class="campo-group">'
-    +'<label class="campo-label">De quem e o presente?</label>'
-    +'<input type="text" placeholder="Ex: Da vovo Maria, da madrinha Ana..." value="'+(ST.respostas.quem_da||'')+'" oninput="ST.respostas.quem_da=this.value"/>'
+    +'<label class="campo-label">De quem \u00e9 o presente?</label>'
+    +'<input type="text" placeholder="Ex: Da Mam\u00e3e, do Papai, da Vov\u00f3 Maria, da Madrinha..." value="'+(ST.respostas.quem_da||'')+'" oninput="ST.respostas.quem_da=this.value"/>'
     +'</div>'
-    +'<div class="campo-group">'
-    +'<label class="campo-label">Algo especial para incluir? <span style="font-weight:400;color:var(--texto-sec)">(opcional)</span></label>'
-    +'<textarea placeholder="Ex: Ela ama unicornios, o cachorro se chama Bolinha, gosta de cantar..." oninput="ST.respostas.detalhe=this.value">'+(ST.respostas.detalhe||'')+'</textarea>'
-    +'</div>'
-    +'<div class="erro-msg" id="erroD">Preencha pelo menos de quem e o presente.</div>'
-    +'<div class="btn-row"><button class="btn btn-secondary" onclick="voltar()">\u2190 Voltar</button><button class="btn btn-primary" onclick="av3()">Gerar historia \u2728</button></div>';
+    +'<div class="erro-msg" id="erroD">Preencha de quem \u00e9 o presente.</div>'
+    +'<div class="btn-row"><button class="btn btn-secondary" onclick="voltar()">\u2190 Voltar</button><button class="btn btn-primary" onclick="av3()">Gerar hist\u00f3ria \u2728</button></div>';
 }
 function av3(){
   if(!ST.respostas.quem_da||!ST.respostas.quem_da.trim()){document.getElementById('erroD').classList.add('show');return;}
+  // v4-simplificado (26/04): removido campo "algo especial".
+  // Garante que o campo n\u00e3o vai vazar para o prompt.
+  ST.respostas.detalhe = '';
   ST.regenHistoria=0;
   ST.personagens.forEach(function(p){p.avatarUrl=null;p.avatarErro=false;});
   ST.step=4; render(); gerarHistoria();
@@ -861,7 +960,7 @@ function s4(c){
   var proto=ST.personagens[0];
   var est=ST.estiloFinal||'narrativo';
   var estLabel=est==='visual'?'\u{1F3A8} Visual':'\ u{1F4DA} Narrativo';
-  c.innerHTML='<div class="slabel">Passo 4 de 6</div>'
+  c.innerHTML='<div class="slabel">Passo 4 de 5</div>'
     +'<h2 class="stit">Criando o livro de '+proto.nome+'...</h2>'
     +'<p class="sdesc">Nossa IA esta escrevendo algo especial!</p>'
     +'<div class="loading-wrap" id="loadWrap">'
@@ -880,6 +979,7 @@ function buildPrompt(est, proto, outros, tema, listaP, instrP){
 
   // Tom especifico por roteiro
   var tomRoteiro = {
+    diadasmaes: 'Historia emocionante de Dia das Maes. Foco no amor entre mae e filho. Momento que celebra a relacao deles, com gestos de carinho, palavras simples e profundas, paisagens calorosas. Final que faz qualquer mae chorar de emocao. Tom lirico mas acessivel, sem ser piegas. Pode ter aventura leve, descoberta, ou apenas um dia especial juntos.',
     aventura: 'Aventura epica. Ritmo acelerado, perigo real, coragem testada, vitoria conquistada.',
     amizade: 'Historia de amizade verdadeira. Conflito entre amigos, incompreensao, reconciliacao emotiva.',
     familia: 'Amor familiar profundo. Momento especial entre pessoas que se amam, detalhe que toca o coracao.',
@@ -1244,10 +1344,13 @@ function s5(c){
   }
 
   // Silhuetas bloqueadas dos personagens secundarios
+  // v4-simplificado (26/04): aviso reformulado para deixar bem claro
+  // que o segundo avatar s\u00f3 \u00e9 gerado dentro do livro final.
   var outrosHtml='';
   if(ST.personagens.length>1){
-    outrosHtml='<div style="margin-top:12px;padding:14px 16px;background:rgba(0,0,0,.04);border-radius:12px;border:1.5px dashed var(--borda)">'
-      +'<div style="font-size:.78rem;font-weight:700;color:var(--texto-sec);margin-bottom:10px">\uD83D\uDC64 Demais personagens gerados ap\u00f3s o pagamento:</div>'
+    outrosHtml='<div style="margin-top:14px;padding:18px 18px;background:linear-gradient(135deg,#FFF6FA,#FFFBF5);border-radius:14px;border:1.5px solid #FFD6E3">'
+      +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><span style="font-size:1.4rem">\u{1F4AB}</span><div style="font-size:.95rem;font-weight:800;color:#7C3AED">Os outros personagens v\u00e3o aparecer no livro!</div></div>'
+      +'<div style="font-size:.82rem;color:var(--texto-sec);line-height:1.5;margin-bottom:12px">Para n\u00e3o atrasar a revis\u00e3o, mostramos s\u00f3 o avatar do protagonista aqui. Os demais ser\u00e3o gerados <strong>diretamente nas p\u00e1ginas do livro</strong> ap\u00f3s a confirma\u00e7\u00e3o do pagamento.</div>'
       +'<div style="display:flex;gap:12px;flex-wrap:wrap">';
     for(var oi=1;oi<ST.personagens.length;oi++){
       var op=ST.personagens[oi];
@@ -1261,7 +1364,7 @@ function s5(c){
     outrosHtml+='</div></div>';
   }
 
-  c.innerHTML='<div class="slabel">Passo 5 de 6</div>'
+  c.innerHTML='<div class="slabel">Passo 5 de 5</div>'
     +'<h2 class="stit">Seu Squishbook est\u00e1 quase pronto!</h2>'
     +'<p class="sdesc">Veja como ficou o avatar de <strong>'+ST.personagens[0].nome+'</strong> e confira o resumo da hist\u00f3ria.</p>'
     +'<div class="regen-bar">'
@@ -1278,11 +1381,19 @@ function s5(c){
     +resumoHtml
     +'<div style="background:linear-gradient(135deg,var(--azul-esc),var(--roxo-esc));border-radius:16px;padding:18px 20px;margin-bottom:16px;color:white;text-align:center">'
     +'<div style="font-size:.85rem;font-weight:800;margin-bottom:6px">\uD83C\uDF81 Seu presente digital inclui:</div>'
-    +'<div style="font-size:.8rem;opacity:.9;line-height:1.8">\u2705 Historia completa com 6 p\u00e1ginas ilustradas<br/>\u2705 Todos os personagens em estilo chibi<br/>\u2705 Cenas com os personagens interagindo<br/>\u2705 PDF personalizado para baixar</div>'
+    +'<div style="font-size:.8rem;opacity:.9;line-height:1.8">\u2705 Hist\u00f3ria completa com 6 p\u00e1ginas ilustradas<br/>\u2705 Todos os personagens em estilo chibi watercolor<br/>\u2705 Capa personalizada com dedicat\u00f3ria<br/>\u2705 PDF entregue por email na hora</div>'
     +'</div>'
+    // v4-simplificado (26/04): email coletado aqui para enviar o PDF depois.
+    // Antes era na tela 6 (que foi removida).
+    +'<div class="campo-group" style="margin-top:14px;background:#FFFBF5;border:1.5px solid #EDE8F8;border-radius:14px;padding:16px 18px">'
+    +'<label class="campo-label" style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font-size:1.2rem">\u{1F4E7}</span> Para qual email enviamos seu Squishbook?</label>'
+    +'<input type="email" placeholder="seu@email.com" value="'+ST.email+'" oninput="ST.email=this.value" style="font-size:1rem;width:100%"/>'
+    +'<div style="font-size:.76rem;color:var(--texto-sec);margin-top:6px">Voc\u00ea tamb\u00e9m poder\u00e1 baixar o PDF imediatamente ap\u00f3s o pagamento.</div>'
+    +'</div>'
+    +'<div class="erro-msg" id="erroEmail">Informe um email v\u00e1lido para continuar.</div>'
     +'<div class="btn-row">'
     +'<button class="btn btn-secondary" onclick="voltar()">\u2190 Voltar</button>'
-    +'<button class="btn btn-primary" id="btnContinuarS5" onclick="av5()">Quero este livro! \u2192</button>'
+    +'<button class="btn btn-primary" id="btnContinuarS5" onclick="av5()">Comprar por R$ 39 \u2192</button>'
     +'</div>';
 
   renderAvatarGrid();
@@ -1601,7 +1712,19 @@ function regenerar(){
   ST.personagens.forEach(function(p){p.avatarUrl=null;p.avatarErro=false;});
   ST.step=4; render(); gerarHistoria();
 }
-function av5(){ ST.step=6; render(); }
+function av5(){
+  // v4-simplificado (26/04): tela 6 (formato/endere\u00e7o/whatsapp) removida.
+  // Email \u00e9 validado aqui na tela 5 e o fluxo pula direto para pagamento.
+  // Formato fica fixo como "digital" (impresso est\u00e1 "em breve").
+  var emailOk=/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ST.email||'');
+  if(!emailOk){
+    var e=document.getElementById('erroEmail');
+    if(e){e.classList.add('show');e.textContent='Informe um email v\u00e1lido para receber o livro.';}
+    return;
+  }
+  ST.formato='digital';
+  ST.step=7; render();
+}
 
 // S6: FORMATO
 function s6(c){
@@ -1732,14 +1855,11 @@ async function buscarCep(cep){
   }
 }
 
-// S7: RESUMO
+// S7: RESUMO (\u00faltima confirma\u00e7\u00e3o antes do pagamento)
 function s7(c){
-  var fmtObj=FORMATOS.filter(function(f){return f.id===ST.formato;})[0];
+  // v4-simplificado (26/04): resumo enxuto. S\u00f3 digital, sem extras.
   var rotObj=ROTEIROS.filter(function(r){return r.id===ST.roteiro;})[0];
-  var extra=ST.extras*PRECO_EXTRA;
-  var total=(fmtObj?fmtObj.p:0)+extra;
-  var estLabel=ST.estiloFinal==='visual'?'\u{1F3A8} Visual':'\u{1F4DA} Narrativo';
-  var gratis=ST.personagens.length<=4?'todos gratis':'4 gratis + '+ST.extras+' extra'+(ST.extras>1?'s':'');
+  var total=39; // pre\u00e7o fixo de lan\u00e7amento
   var chipsHtml='';
   for(var i=0;i<ST.personagens.length;i++){
     var p=ST.personagens[i];
@@ -1751,26 +1871,21 @@ function s7(c){
     var pl=PAPEIS.filter(function(r){return r.v===p.papel;})[0].l;
     chipsHtml+='<div class="p-chip">'+fHtml+'<div><div class="p-chip-nome">'+p.nome+'</div><div class="p-chip-papel">'+pl+'</div></div></div>';
   }
-  var extLinha=extra>0?'<div class="resumo-item"><strong>\u2B50 Extras</strong><span>+ R$ '+fmtMoney(extra)+'</span></div>':'';
-  c.innerHTML='<div class="slabel">Quase la! \u2728</div>'
-    +'<h2 class="stit">Confirme seu pedido</h2>'
-    +'<p class="sdesc">Revise tudo antes de finalizar.</p>'
+  c.innerHTML='<div class="slabel">\u{1F4B3} Pagamento</div>'
+    +'<h2 class="stit">Quase l\u00e1! \u2728</h2>'
+    +'<p class="sdesc">Confirme os dados antes de finalizar a compra.</p>'
     +'<div class="pers-chips" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:18px">'+chipsHtml+'</div>'
     +'<div class="resumo-lista">'
-    +'<div class="resumo-item"><strong>\u{1F4D6} Titulo</strong><span>'+ST.historia.titulo+'</span></div>'
-    +'<div class="resumo-item"><strong>\u{1F3A8} Estilo</strong><span>'+estLabel+'</span></div>'
-    +'<div class="resumo-item"><strong>\u{1F382} Idade</strong><span>'+ST.idadeCrianca+' anos</span></div>'
-    +'<div class="resumo-item"><strong>\u{1F381} De</strong><span>'+ST.respostas.quem_da+'</span></div>'
-    +'<div class="resumo-item"><strong>\u{1F4DA} Tipo</strong><span>'+(ST.tipoHistoria==='roteiro'&&rotObj?rotObj.t:'Historia personalizada')+'</span></div>'
-    +'<div class="resumo-item"><strong>\u{1F465} Personagens</strong><span>'+ST.personagens.length+' ('+gratis+')</span></div>'
-    +'<div class="resumo-item"><strong>'+(fmtObj?fmtObj.ec:'')+' Formato</strong><span>'+(fmtObj?fmtObj.t:'')+'</span></div>'
-    +extLinha
-    +'<div class="resumo-item"><strong>\u{1F4B0} Total</strong><span class="resumo-preco">R$ '+fmtMoney(total)+'</span></div>'
+    +'<div class="resumo-item"><strong>\u{1F4D6} Livro</strong><span>'+ST.historia.titulo+'</span></div>'
+    +'<div class="resumo-item"><strong>\u{1F3AD} Tema</strong><span>'+(rotObj?rotObj.t:'')+'</span></div>'
     +'<div class="resumo-item"><strong>\u{1F4E7} Email</strong><span>'+ST.email+'</span></div>'
-    +(ST.telefone?'<div class="resumo-item"><strong>\u{1F4F1} WhatsApp</strong><span>'+ST.telefone+'</span></div>':'')
-    +(ST.formato==='impresso'&&ST.endereco.cep?'<div class="resumo-item"><strong>\u{1F4E6} Endereço</strong><span>'+ST.endereco.logradouro+', '+ST.endereco.numero+(ST.endereco.complemento?' '+ST.endereco.complemento:'')+' — '+ST.endereco.bairro+', '+ST.endereco.cidade+'/'+ST.endereco.estado+' — CEP '+ST.endereco.cep+'</span></div>':'')
+    +'<div class="resumo-item"><strong>\u{1F4F1} Formato</strong><span>Digital (PDF)</span></div>'
+    +'<div class="resumo-item"><strong>\u{1F4B0} Total</strong><span class="resumo-preco">R$ '+fmtMoney(total)+'</span></div>'
     +'</div>'
-    +'<div class="btn-row"><button class="btn btn-secondary" onclick="voltar()">\u2190 Ajustar</button><button class="btn btn-sucesso" onclick="finalizar()">\u2705 Finalizar R$ '+fmtMoney(total)+'</button></div>'
+    +'<div style="background:linear-gradient(135deg,#FFF6FA,#FFFBF5);border:1.5px solid #FFD6E3;border-radius:14px;padding:14px 16px;margin-top:14px;font-size:.85rem;line-height:1.55;color:#7C3AED">'
+    +'\u{1F381} <strong>Promo\u00e7\u00e3o de lan\u00e7amento Dia das M\u00e3es:</strong> de <span style="text-decoration:line-through">R$ 59</span> por R$ 39. V\u00e1lido at\u00e9 10 de maio.'
+    +'</div>'
+    +'<div class="btn-row"><button class="btn btn-secondary" onclick="voltar()">\u2190 Ajustar</button><button class="btn btn-sucesso" onclick="finalizar()">\u2705 Pagar R$ '+fmtMoney(total)+'</button></div>'
     +'<div style="text-align:center;margin-top:10px"><button onclick="ST.step=8;render()" style="background:none;border:none;font-size:.76rem;color:var(--texto-sec);cursor:pointer;text-decoration:underline">\uD83E\uDDEA Modo teste: ver livro sem pagar</button></div>';
 }
 // ═══ ESTADO POS-PAGAMENTO ═══════════════════════════════════
@@ -1793,8 +1908,10 @@ async function finalizar(){
     +'<div class="loading-txt">Preparando pagamento...</div>'
     +'<div class="loading-sub">Aguarde um instante</div></div>';
   try{
-    // Abre link de pagamento MP em nova aba (digital R$79 / impresso R$159)
-    var linkMP = ST.formato === 'impresso' ? 'https://mpago.la/2NR4wsz' : 'https://mpago.la/1U9tCUv';
+    // Links Mercado Pago — atualizados em 26/04/26 (Sessão 4 lançamento)
+    var LINK_MP_DIGITAL = 'https://mpago.la/2V2zGnT';   // R$ 39 (promoção lançamento Dia das Mães)
+    var LINK_MP_IMPRESSO = 'https://mpago.la/2NR4wsz';  // R$ 159 (impresso, futuro)
+    var linkMP = ST.formato === 'impresso' ? LINK_MP_IMPRESSO : LINK_MP_DIGITAL;
     window.open(linkMP, '_blank');
     // Mostra tela de aguardando pagamento
     var elPag=document.getElementById('cardContent');
@@ -2257,6 +2374,7 @@ function descreverPersonagemParaPrompt(p, expressao, isPrincipal){
 // Retorna: { cenario:'...', objetos:[{nome,tipo,descricao}], acao:'...', personagensPresentes:['Nome1','Nome2'] }
 async function extrairElementosDaCena(texto, titulo, roteiro, personagensCadastrados){
   var fallbacks={
+    diadasmaes:'beautiful spring garden with blooming flowers, warm afternoon sunlight, soft pastel colors and gentle breeze',
     aventura:'lush enchanted forest trail with ancient trees, magical glowing mushrooms and golden sunrays',
     amizade:'sunny colorful playground with swings, slides and bright flowers in warm afternoon light',
     familia:'warm cozy living room with soft sofa, family photos on wall, fireplace and colorful rugs',
@@ -2642,7 +2760,8 @@ async function gerarCenaPagina(pg,idx){
 
   // Atmosfera por roteiro (preservado da v3)
   var atmosfera;
-  if(roteiro==='terror') atmosfera='spooky mood, deep shadows, eerie moonlight, cute but slightly scary atmosphere';
+  if(roteiro==='diadasmaes') atmosfera='warm tender mother and child mood, soft golden afternoon light, pastel pink and lavender hues, blooming flowers';
+  else if(roteiro==='terror') atmosfera='spooky mood, deep shadows, eerie moonlight, cute but slightly scary atmosphere';
   else if(roteiro==='aventura') atmosfera='adventurous mood, dramatic golden hour lighting';
   else if(roteiro==='magia') atmosfera='magical enchanted mood, soft glowing sparkles, dreamy pastel mist';
   else if(roteiro==='familia') atmosfera='warm cozy family mood, soft golden indoor lighting';
@@ -3524,7 +3643,12 @@ async function gerarPDFAutomatico(htmlContent, titulo){
   }
 }
 
-function voltar(){ if(ST.step>1){ ST.step--; render(); } }
+function voltar(){
+  // v4-simplificado (26/04): tela 6 (formato/endere\u00e7o) foi removida.
+  // Voltar da tela 7 (pagamento) leva direto para a tela 5 (revis\u00e3o).
+  if(ST.step===7){ ST.step=5; render(); return; }
+  if(ST.step>1){ ST.step--; render(); }
+}
 render();
 
 // Verifica retorno do Mercado Pago

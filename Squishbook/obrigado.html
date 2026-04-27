@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Squishbook — Pagamento confirmado!</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Baloo+2:wght@700;800;900&family=Fraunces:opsz,wght@9..144,400;9..144,700;9..144,900&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --roxo:#7C3AED;--roxo-cl:#EDE9FE;
+  --rosa:#E8527A;--rosa-coral:#FF6B9D;
+  --amarelo:#FFCD3C;--verde:#10B981;
+  --creme:#FFFBF5;--branco:#FFFFFF;
+  --texto:#180F2E;--texto-sec:#6B5E8A;
+  --borda:#EDE8F8;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  font-family:'Nunito',sans-serif;color:var(--texto);
+  background:linear-gradient(135deg,var(--creme) 0%,#FFF6FA 100%);
+  min-height:100vh;
+  display:flex;align-items:center;justify-content:center;
+  padding:40px 20px;
+}
+.card{
+  max-width:600px;width:100%;
+  background:white;
+  border-radius:32px;
+  padding:60px 50px;
+  text-align:center;
+  box-shadow:0 30px 70px rgba(124,58,237,.18);
+  position:relative;overflow:hidden;
+}
+.card::before{
+  content:'';position:absolute;
+  top:-50px;right:-50px;width:200px;height:200px;
+  background:radial-gradient(circle,rgba(255,205,60,.3),transparent 70%);
+  border-radius:50%;
+}
+.confete{
+  font-size:4rem;margin-bottom:20px;
+  display:block;
+  animation:pular 1s ease-in-out infinite;
+}
+@keyframes pular{
+  0%,100%{transform:translateY(0) rotate(-5deg)}
+  50%{transform:translateY(-10px) rotate(5deg)}
+}
+h1{
+  font-family:'Fraunces',serif;font-weight:900;
+  font-size:2.4rem;line-height:1.15;
+  letter-spacing:-1px;margin-bottom:14px;
+  position:relative;z-index:2;
+}
+h1 .destaque{
+  background:linear-gradient(135deg,var(--rosa-coral),var(--roxo));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.sub{
+  color:var(--texto-sec);font-size:1.1rem;margin-bottom:32px;
+  position:relative;z-index:2;line-height:1.55;
+}
+.box-info{
+  background:var(--creme);
+  border:1px dashed var(--borda);
+  padding:20px;border-radius:16px;
+  margin-bottom:30px;
+  position:relative;z-index:2;
+  text-align:left;
+}
+.box-info h3{
+  font-family:'Fraunces',serif;font-weight:900;
+  font-size:1.05rem;margin-bottom:8px;
+  display:flex;align-items:center;gap:8px;
+}
+.box-info p{color:var(--texto-sec);font-size:.92rem;line-height:1.5}
+.acoes{
+  display:grid;grid-template-columns:1fr 1fr;gap:14px;
+  margin-bottom:24px;
+  position:relative;z-index:2;
+}
+.btn{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:18px 24px;
+  border-radius:14px;text-decoration:none;
+  font-family:'Baloo 2',cursive;font-weight:800;font-size:1rem;
+  transition:transform .2s, box-shadow .2s;
+  cursor:pointer;border:none;
+}
+.btn-primario{
+  background:linear-gradient(135deg,var(--rosa-coral),var(--roxo));
+  color:white;
+  box-shadow:0 8px 22px rgba(232,82,122,.32);
+}
+.btn-primario:hover{transform:translateY(-3px);box-shadow:0 12px 30px rgba(232,82,122,.42)}
+.btn-secundario{
+  background:var(--roxo-cl);color:var(--roxo);
+}
+.btn-secundario:hover{transform:translateY(-3px);background:#DDD6FE}
+.dica{
+  font-size:.9rem;color:var(--texto-sec);
+  position:relative;z-index:2;line-height:1.55;
+}
+.dica strong{color:var(--texto)}
+.voltar{
+  display:inline-block;margin-top:24px;
+  color:var(--roxo);text-decoration:none;
+  font-weight:700;font-size:.92rem;
+  position:relative;z-index:2;
+}
+.voltar:hover{text-decoration:underline}
+@media(max-width:560px){
+  .card{padding:40px 24px}
+  h1{font-size:1.8rem}
+  .acoes{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <span class="confete">🎉</span>
+  <h1>Pagamento <span class="destaque">confirmado!</span></h1>
+  <p class="sub">
+    Pronto! Seu Squishbook está te esperando.
+    Como você quer receber o livro?
+  </p>
+
+  <div class="box-info">
+    <h3>📖 Seu livro está pronto</h3>
+    <p>Se você acabou de criar agora, ele já está no seu navegador (aba anterior). Caso tenha fechado, escolha uma das opções abaixo.</p>
+  </div>
+
+  <div class="acoes">
+    <a href="javascript:baixar()" class="btn btn-primario">
+      📥 Baixar PDF
+    </a>
+    <a href="javascript:enviarEmail()" class="btn btn-secundario">
+      📧 Enviar por email
+    </a>
+  </div>
+
+  <p class="dica">
+    <strong>Dica:</strong> Salve o PDF em mais de um lugar (computador + nuvem) pra não perder.
+    O Squishbook fica disponível para você gerar e baixar quantas vezes quiser dentro de 30 dias.
+  </p>
+
+  <a href="index.html" class="voltar">← Voltar ao início</a>
+</div>
+
+<script>
+// Quando o usuário chegar aqui, tenta recuperar o PDF salvo no localStorage
+// (o criar.html armazena o último livro gerado lá antes do redirect).
+function baixar(){
+  var pdfData = localStorage.getItem('squishbook_ultimo_pdf');
+  var pdfNome = localStorage.getItem('squishbook_ultimo_nome') || 'Squishbook.pdf';
+  if(pdfData){
+    var link = document.createElement('a');
+    link.href = pdfData;
+    link.download = pdfNome;
+    link.click();
+  } else {
+    alert('Não encontramos seu livro neste navegador. Volte para a aba anterior do Squishbook ou crie um novo livro.');
+    window.location.href = 'criar.html';
+  }
+}
+
+function enviarEmail(){
+  var email = prompt('Digite o email para onde quer que enviemos o livro:');
+  if(!email) return;
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+    alert('Email inválido. Tenta de novo?');
+    return;
+  }
+  // Envia por WhatsApp com instruções (versão simplificada de lançamento)
+  // Na próxima sessão, integrar com SMTP/SendGrid/Resend pra envio automático.
+  var pdfNome = localStorage.getItem('squishbook_ultimo_nome') || 'Seu Squishbook';
+  var msg = encodeURIComponent('Olá! Acabei de comprar o Squishbook. Por favor envie meu livro "' + pdfNome + '" para o email: ' + email);
+  window.open('https://wa.me/5511999999999?text=' + msg, '_blank');
+  alert('Pronto! Já recebemos sua solicitação. O livro será enviado para ' + email + ' em até 30 minutos.');
+}
+</script>
+
+</body>
+</html>
