@@ -523,7 +523,18 @@ var CENARIOS_BLOQUEADOS = [
 
   // Bloco 3: cen\u00e1rios muito detalhados que o modelo preenche com pessoas
   {regex:/pra\u00e7a\b|\bpublic square/i, alternativo:'um caminho entre \u00e1rvores'},
-  {regex:/shopping|mall|centro comercial/i, alternativo:'uma loja aconchegante com prateleiras coloridas'}
+  {regex:/shopping|mall|centro comercial/i, alternativo:'uma loja aconchegante com prateleiras coloridas'},
+
+  // Bloco 4 (Sess\u00e3o 4.1, 27/04): gatilhos visuais isolados que o Claude (Haiku) usa
+  // para descrever o ambiente sem cair nas regex de "quarto infantil/nursery".
+  // Descoberto no livro "Dia das M\u00e3es" do Beni: cen\u00e1rio "bedroom with crib and toy
+  // shelf" passou a blacklist e o FLUX.2 gerou quarto cl\u00e1ssico de bebezinho com
+  // brinquedos espalhados (e desenhos no ch\u00e3o que o modelo interpretou como crian\u00e7as).
+  {regex:/\bcrib\b|\bbaby cot\b|\bcot\b(?!\s+light)/i, alternativo:'a small nightstand with a cup'},
+  {regex:/child(?:'s)? bedroom|girl(?:'s)? bedroom|boy(?:'s)? bedroom|toddler bedroom/i, alternativo:'a simple cozy bedroom with a single bed'},
+  {regex:/toy shelf|shelf of toys|toys on (?:a )?shelf|shelf with (?:plush )?toys|stuffed animals on (?:a )?shelf/i, alternativo:'a wooden shelf with small flowers and books'},
+  {regex:/dollhouse|doll house/i, alternativo:'a small wooden chest'},
+  {regex:/playmat|play mat|colorful rug with letters/i, alternativo:'a soft beige rug'}
 ];
 // Fim do bloco v4
 
@@ -977,6 +988,33 @@ function buildPrompt(est, proto, outros, tema, listaP, instrP){
   var detalhe = ST.respostas.detalhe || 'nenhum';
   var p = '';
 
+  // ── Classificação visual vs narrativo (Sessão 4.1, 27/04) ──────────────
+  // FLUX.2 multi-reference aceita até 2 personagens com foto. Demais ficam
+  // como narrativos: aparecem no texto da história mas NUNCA na ilustração.
+  // Mesmo critério usado em gerarCenaPagina (linha ~2700).
+  var __personagensVisuais = [];
+  var __personagensNarrativos = [];
+  (function(){
+    var prot = ST.personagens.filter(function(p){return p.papel==='protagonista';})[0] || ST.personagens[0];
+    if(prot) __personagensVisuais.push(prot);
+    var outros = ST.personagens.filter(function(p){return p !== prot && p.nome;});
+    // Mesma prioridade do corte em gerarCenaPagina
+    outros.sort(function(a,b){
+      var rank={familiar:0, amigo:1, outro:2};
+      return (rank[a.papel]||3) - (rank[b.papel]||3);
+    });
+    for(var oi=0; oi<outros.length; oi++){
+      // Se já temos 2 visuais OU se o personagem não tem foto, vira narrativo
+      if(__personagensVisuais.length >= 2 || !outros[oi].fotoUrl){
+        __personagensNarrativos.push(outros[oi]);
+      } else {
+        __personagensVisuais.push(outros[oi]);
+      }
+    }
+  })();
+  var nomesVisuais = __personagensVisuais.map(function(x){return x.nome;}).join(', ');
+  var nomesNarrativos = __personagensNarrativos.map(function(x){return x.nome;}).join(', ');
+
   // Tom especifico por roteiro
   var tomRoteiro = {
     diadasmaes: 'Historia emocionante de Dia das Maes. Foco no amor entre mae e filho. Momento que celebra a relacao deles, com gestos de carinho, palavras simples e profundas, paisagens calorosas. Final que faz qualquer mae chorar de emocao. Tom lirico mas acessivel, sem ser piegas. Pode ter aventura leve, descoberta, ou apenas um dia especial juntos.',
@@ -1006,13 +1044,18 @@ function buildPrompt(est, proto, outros, tema, listaP, instrP){
     // FIX Roteiro #2: elenco no topo do prompt, antes de qualquer outra regra,
     // com checklist obrigatório por personagem pra impedir que o Claude esqueça
     // coadjuvantes (bebês, secundários) em roteiros intensos como Terror.
+    // Sessão 4.1 (27/04): elenco distingue VISUAIS (com foto, até 2) de NARRATIVOS.
     var totalPers = ST.personagens.length;
     var nomesTodos = ST.personagens.map(function(x){return x.nome;}).join(', ');
-    var checklistPers = ST.personagens.map(function(x,i){
+    var checklistPers = __personagensVisuais.map(function(x,i){
       var ppl2 = PAPEIS.filter(function(r){return r.v===x.papel;})[0];
       var lbl = ppl2 ? ppl2.l : x.papel;
-      return '  [ ] '+x.nome+' ('+lbl+'): aparece em pelo menos 2 paginas com fala ou acao propria';
-    }).join('\n');
+      return '  [ ] '+x.nome+' ('+lbl+', VISUAL): protagoniza cenas, fala, age fisicamente em pelo menos 2 paginas';
+    }).concat(__personagensNarrativos.map(function(x){
+      var ppl3 = PAPEIS.filter(function(r){return r.v===x.papel;})[0];
+      var lbl = ppl3 ? ppl3.l : x.papel;
+      return '  [ ] '+x.nome+' ('+lbl+', NARRATIVO): mencionado em fala/lembranca/recado, NUNCA em acao fisica da cena, NUNCA dorme/come/anda na cena';
+    })).join('\n');
 
     p = 'Voce e o melhor autor brasileiro de livros infantis ilustrados. Cada pagina e uma cena que faz criancas pedirem "le de novo!"\n\n';
     // ELENCO OBRIGATORIO no topo, formato de briefing
@@ -1021,8 +1064,11 @@ function buildPrompt(est, proto, outros, tema, listaP, instrP){
     p += listaP + '\n';
     if(totalPers > 1){
       p += 'CHECKLIST (antes de escrever, voce vai usar TODOS):\n' + checklistPers + '\n\n';
-      p += 'REGRA DE INCLUSAO INEGOCIAVEL: Esta historia tem '+totalPers+' personagens cadastrados e TODOS sao reais para a crianca que vai ler. Nao importa o tema. Mesmo em terror, mesmo em aventura solo, mesmo em sonho: TODOS aparecem, TODOS tem voz, TODOS sao parte da historia. Bebes e criancas pequenas aparecem carregados, observando, reagindo, dormindo na cena ao lado, mas APARECEM. Se voce terminar e perceber que esqueceu alguem, volte e reescreva.\n\n';
-      p += 'ANTI-PADRAO TERROR: terror infantil aqui NAO e historia de isolamento. A familia enfrenta o susto JUNTA. O protagonista pode liderar, mas os outros personagens estao na cena, ajudando, se escondendo juntos, sendo protegidos, se protegendo. Ninguem some "porque nao cabe no enredo de terror". Voce da jeito de caber.\n\n';
+      p += 'REGRA DOS PERSONAGENS VISUAIS ('+__personagensVisuais.length+' pessoas: '+nomesVisuais+'): sao os unicos que APARECEM nas ilustracoes. Cada um tem voz, fala e age fisicamente nas cenas. Cada um aparece em pelo menos 2 paginas. O protagonista esta em todas.\n\n';
+      if(__personagensNarrativos.length > 0){
+        p += 'REGRA DOS PERSONAGENS NARRATIVOS ('+__personagensNarrativos.length+' pessoas: '+nomesNarrativos+'): estes personagens sao reais para a crianca, MAS NAO APARECEM NA ILUSTRACAO. Podem ser citados em falas ("Olha o que a vovo nos mandou"), em lembrancas ("Pietra ja tinha brincado com isso") ou em recados ("esse desenho e pra mostrar pra ela depois"). PROIBIDO descreve-los em ACAO FISICA dentro da cena. Nao escreva "Pietra dormia no berco ao lado", "a vovo entrou", "o papai deu a mao". Tratar como pessoa que esta em outro lugar/momento. NUNCA mencione onde eles estao fisicamente agora (cama, bercario, sofa) — isso induz a IA de imagem a desenha-los e quebra a ilustracao.\n\n';
+      }
+      p += 'ANTI-PADRAO TERROR: terror infantil aqui NAO e historia de isolamento. Os personagens visuais enfrentam o susto JUNTOS. Os narrativos podem ser lembrados ("a mae esperava em casa"), mas nao entram na cena.\n\n';
     }
     p += '=====================================================\n\n';
     p += vocabInstrucao + '\n\n';
@@ -1084,11 +1130,15 @@ function buildPrompt(est, proto, outros, tema, listaP, instrP){
     // FIX Roteiro #2: mesma estrutura do modo visual — elenco no topo e checklist.
     var totalPersN = ST.personagens.length;
     var nomesTodosN = ST.personagens.map(function(x){return x.nome;}).join(', ');
-    var checklistPersN = ST.personagens.map(function(x){
+    var checklistPersN = __personagensVisuais.map(function(x){
       var ppl3 = PAPEIS.filter(function(r){return r.v===x.papel;})[0];
       var lbl = ppl3 ? ppl3.l : x.papel;
-      return '  [ ] '+x.nome+' ('+lbl+'): ao menos uma fala e uma acao propria ao longo da historia';
-    }).join('\n');
+      return '  [ ] '+x.nome+' ('+lbl+', VISUAL): protagoniza cenas, fala, age fisicamente em pelo menos 2 paginas';
+    }).concat(__personagensNarrativos.map(function(x){
+      var ppl4 = PAPEIS.filter(function(r){return r.v===x.papel;})[0];
+      var lbl = ppl4 ? ppl4.l : x.papel;
+      return '  [ ] '+x.nome+' ('+lbl+', NARRATIVO): mencionado em fala/lembranca/recado, NUNCA em acao fisica da cena, NUNCA dorme/come/anda na cena';
+    })).join('\n');
 
     p = 'Voce e um dos maiores autores brasileiros de literatura infantil. Voce conhece o segredo das historias que ficam para sempre: personagens reais, emocoes verdadeiras, fio narrativo que prende do inicio ao fim.\n\n';
     p += 'Esta historia sera impressa e dada de presente. Ela precisa ser boa o suficiente para guardar pelo resto da vida.\n\n';
@@ -1098,8 +1148,11 @@ function buildPrompt(est, proto, outros, tema, listaP, instrP){
     p += listaP + '\n';
     if(totalPersN > 1){
       p += 'CHECKLIST (antes de escrever, voce vai usar TODOS):\n' + checklistPersN + '\n\n';
-      p += 'REGRA DE INCLUSAO INEGOCIAVEL: Esta historia tem '+totalPersN+' personagens cadastrados e TODOS sao reais para a crianca que vai ler. Nao importa o tema. Mesmo em terror, mesmo em aventura solo, mesmo em sonho: TODOS aparecem, TODOS tem voz, TODOS sao parte da historia. Bebes e criancas pequenas aparecem carregados, observando, reagindo, dormindo na cena ao lado, mas APARECEM. Se voce terminar e perceber que esqueceu alguem, volte e reescreva.\n\n';
-      p += 'ANTI-PADRAO TERROR: terror infantil aqui NAO e historia de isolamento. A familia enfrenta o susto JUNTA. O protagonista pode liderar, mas os outros personagens estao na cena, ajudando, se escondendo juntos, sendo protegidos, se protegendo. Ninguem some "porque nao cabe no enredo de terror". Voce da jeito de caber.\n\n';
+      p += 'REGRA DOS PERSONAGENS VISUAIS ('+__personagensVisuais.length+' pessoas: '+nomesVisuais+'): sao os unicos que APARECEM nas ilustracoes. Cada um tem voz, fala e age fisicamente. Aparecem em pelo menos 2 paginas. O protagonista em todas.\n\n';
+      if(__personagensNarrativos.length > 0){
+        p += 'REGRA DOS PERSONAGENS NARRATIVOS ('+__personagensNarrativos.length+' pessoas: '+nomesNarrativos+'): reais para a crianca, MAS NAO APARECEM NA ILUSTRACAO. Citados em falas, lembrancas, recados. PROIBIDO descreve-los em ACAO FISICA na cena (nao escreva "Pietra dormia no berco", "a vovo entrou", "o papai deu a mao"). Tratar como pessoa que esta em outro lugar/momento. NUNCA mencione onde estao fisicamente agora.\n\n';
+      }
+      p += 'ANTI-PADRAO TERROR: terror infantil aqui NAO e historia de isolamento. Os personagens visuais enfrentam o susto JUNTOS. Os narrativos podem ser lembrados, mas nao entram na cena.\n\n';
     }
     p += '=====================================================\n\n';
     p += vocabInstrucao + '\n\n';
@@ -2372,7 +2425,7 @@ function descreverPersonagemParaPrompt(p, expressao, isPrincipal){
 
 // Extrai TUDO da cena em uma única chamada: cenário + objetos narrativos + ação específica + personagens presentes
 // Retorna: { cenario:'...', objetos:[{nome,tipo,descricao}], acao:'...', personagensPresentes:['Nome1','Nome2'] }
-async function extrairElementosDaCena(texto, titulo, roteiro, personagensCadastrados){
+async function extrairElementosDaCena(texto, titulo, roteiro, personagensCadastrados, personagensNarrativos){
   var fallbacks={
     diadasmaes:'beautiful spring garden with blooming flowers, warm afternoon sunlight, soft pastel colors and gentle breeze',
     aventura:'lush enchanted forest trail with ancient trees, magical glowing mushrooms and golden sunrays',
@@ -2387,12 +2440,15 @@ async function extrairElementosDaCena(texto, titulo, roteiro, personagensCadastr
   var fallbackObj={cenario:fallbackCenario, objetos:[], acao:'', personagensPresentes:(personagensCadastrados||[]).map(function(p){return p.nome;})};
 
   var listaCad=(personagensCadastrados||[]).map(function(p){return p.nome+' ('+p.papel+')';}).join(', ');
+  var listaNarr=(personagensNarrativos||[]).map(function(p){return p.nome;}).join(', ');
   try{
     var prompt='You are analyzing a page of a childrens book to help an image generator create an accurate illustration. Return a JSON object with 4 fields.\n\n'
       +'Page title: '+titulo+'\n'
       +'Page text: '+texto+'\n'
       +'Story theme: '+roteiro+'\n'
-      +'Registered characters (these are the REAL people in the book, each with their own photo reference): '+listaCad+'\n\n'
+      +'Registered characters WITH PHOTO (these are the REAL people who will be drawn): '+listaCad+'\n'
+      +(listaNarr ? 'Narrative-only characters (mentioned in the story but MUST NOT appear in the illustration, MUST NOT be implied by furniture or props): '+listaNarr+'\n' : '')
+      +'\n'
       +'Return ONLY valid JSON (no markdown fences, no preamble). Schema:\n'
       +'{\n'
       +'  "cenario": "one short English sentence (max 20 words) describing ONLY the background setting. NO characters, NO people. Example: cozy wooden bedroom with blue bedsheets and warm moonlight through window",\n'
@@ -2406,6 +2462,8 @@ async function extrairElementosDaCena(texto, titulo, roteiro, personagensCadastr
       +'- If the text mentions a "monster", "shadow", "creature" that is actually imaginary or a misperception (revealed later as just a shadow), still describe it visually for THIS scene.\n'
       +'- acao: describe what is happening visually in THIS specific scene using action verbs. This is the most important field.\n'
       +'- cenario: CRITICAL: describe ONLY the physical environment (architecture, furniture, nature, lighting). NEVER describe or imply other people, children, visitors, bystanders, crowds, classmates, or families in the environment. If the original text mentions a "kids room" or "classroom" or "party", describe only the physical objects (beds, desks, decorations) without implying other people are there. The scene must feel like the empty environment that the registered characters will enter. Keep it simple: max 20 words.\n'
+      +'- cenario ANTI-ADJACENCY RULE: if the page text mentions a person whose name is NOT in the registered characters list (for example "Pietra was sleeping in the crib"), or if that name is in the narrative-only list above, you MUST omit any object that visually implies that absent person. NEVER include in cenario: cribs, baby cots, toy shelves, dollhouses, stuffed animals on shelves, play mats with letters, child-coded bedrooms with multiple toys, second beds, third chairs at a table, extra plates. Replace with neutral furniture (a single nightstand, a shelf with books and flowers, a plain cozy bedroom with one bed). The image must NEVER suggest that someone other than the registered characters lives or just left this space.\n'
+      +'- acao ANTI-ADJACENCY RULE: if the page text shows a narrative-only character doing something physical ("Pietra crawled toward Mom", "the grandma entered the room"), do NOT translate it to acao. acao describes ONLY what the registered (with-photo) characters are doing. If the only action in the text belongs to a narrative-only character, fall back to a soft action of the protagonist alone (looking, smiling, holding the drawing).\n'
       +'- All text values (cenario, tipo, descricao, acao) must be in English. Only "nome" stays in Portuguese.\n';
 
     var res=await fetch('https://squishbook-backend-v2.onrender.com/api/historia',{
@@ -2502,13 +2560,14 @@ async function fotoParaDataUrl(fotoUrl, maxPx){
 
 // Filtra cenário contra blacklist de composições que alucinam terceiro personagem.
 // Descoberto nos Testes 4 e 4B: sofá+livro vira 3 pessoas no FLUX.2.
+// Aplica TODAS as regras que casarem em cascata (um cenário pode ter múltiplos
+// gatilhos: "bedroom with crib AND toy shelf"). Sessão 4.1, 27/04.
 function filtrarCenarioV4(cenario, qtdPersonagens){
   if(!cenario || qtdPersonagens < 2) return cenario;
   for(var i=0; i<CENARIOS_BLOQUEADOS.length; i++){
     var regra = CENARIOS_BLOQUEADOS[i];
     if(regra.regex.test(cenario)){
-      // Substitui o termo perigoso pelo alternativo
-      return cenario.replace(regra.regex, regra.alternativo);
+      cenario = cenario.replace(regra.regex, regra.alternativo);
     }
   }
   return cenario;
@@ -2743,7 +2802,12 @@ async function gerarCenaPagina(pg,idx){
   }
 
   // Extrai cenário via Claude (preservado da v3)
-  var elementos = await extrairElementosDaCena(pg.texto||'', pg.titulo||'', roteiro, parsNaPg);
+  // Sessão 4.1 (27/04): lista de narrativos = ST.personagens \ parsNaPg.
+  // Haiku usa essa lista para NÃO induzir mobília/props que sugerem ausentes.
+  var personagensNarrativos = ST.personagens.filter(function(p){
+    return p.nome && parsNaPg.indexOf(p) < 0;
+  });
+  var elementos = await extrairElementosDaCena(pg.texto||'', pg.titulo||'', roteiro, parsNaPg, personagensNarrativos);
   var cenario = elementos.cenario || 'a storybook scene';
 
   // Filtra cenário contra blacklist (NOVO v4)
