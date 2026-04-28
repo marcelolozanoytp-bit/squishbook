@@ -447,8 +447,8 @@ textarea:focus,input:focus{border-color:var(--azul)}
 
 <!-- Banner topo Dia das M\u00e3es (sincronizado com landing) -->
 <div class="banner-topo">
-  \u2728 <strong>ESPECIAL DIA DAS M\u00c3ES</strong> \u2014 33% OFF de lan\u00e7amento at\u00e9 10 de maio
-  <span class="countdown" id="countdownCriar">\u23f0 Faltam 14 dias</span>
+  ✨ <strong>ESPECIAL DIA DAS MÃES</strong> — 33% OFF de lançamento até 10 de maio
+  <span class="countdown" id="countdownCriar">⏰ Faltam 14 dias</span>
 </div>
 
 <header class="header">
@@ -2576,21 +2576,23 @@ function filtrarCenarioV4(cenario, qtdPersonagens){
 // Descrição enxuta de um personagem para o prompt FLUX.2.
 // NÃO hardcoda features físicas (barba/óculos/tatuagem) — FLUX.2 extrai da foto.
 // Apenas ancora idade e gênero explicitamente, que foi o que os 6 testes validaram.
+// Sessão 5 (27/04): "adult" agora vem com traços maduros explícitos para neutralizar
+// o viés chibi-anime de retratar mulher adulta jovem como adolescente.
 function descricaoPersonagemV4(p){
   var gf = detectaGeneroFaixa(p);
   var base = '';
   if(gf.faixa==='baby/toddler') base = gf.genero==='female' ? 'a baby girl' : 'a baby boy';
   else if(gf.faixa==='child') base = gf.genero==='female' ? 'a young girl' : 'a young boy';
   else if(gf.faixa==='teenager') base = gf.genero==='female' ? 'a teenage girl' : 'a teenage boy';
-  else if(gf.faixa==='adult') base = gf.genero==='female' ? 'an adult woman' : 'an adult man';
+  else if(gf.faixa==='adult') base = gf.genero==='female' ? 'a grown adult woman with mature adult facial features and a fully adult body, NOT a teenager, NOT a child' : 'a grown adult man with mature adult facial features and a fully adult body, NOT a teenager';
   else if(gf.faixa==='elderly') base = gf.genero==='female' ? 'an elderly woman' : 'an elderly man';
   else base = gf.genero==='female' ? 'a female person' : 'a male person';
 
   // Adiciona papel se for familiar/amigo (contexto que ajuda o modelo)
   var papel = '';
   if(p.papel==='familiar'){
-    if(gf.faixa==='adult' && gf.genero==='female') papel=' (a mother)';
-    else if(gf.faixa==='adult' && gf.genero==='male') papel=' (a father)';
+    if(gf.faixa==='adult' && gf.genero==='female') papel=' (a real mother, adult age 30 to 40)';
+    else if(gf.faixa==='adult' && gf.genero==='male') papel=' (a real father, adult age 30 to 40)';
     else if(gf.faixa==='elderly' && gf.genero==='female') papel=' (a grandmother)';
     else if(gf.faixa==='elderly' && gf.genero==='male') papel=' (a grandfather)';
   }
@@ -2599,13 +2601,15 @@ function descricaoPersonagemV4(p){
 
 // Detecta se a cena precisa de reforço de escala (adulto + criança juntos).
 // Descoberto no Teste 3: sem reforço explícito, Mamãe vira adolescente em cenas dinâmicas.
+// Sessão 5 (27/04): reforço expandido para combater "saia de colegial / vestido juvenil"
+// que aparece quando o detector classifica adulto jovem como teenager por viés do modelo.
 function reforcoEscalaV4(personagens){
   if(personagens.length < 2) return '';
   var gfs = personagens.map(detectaGeneroFaixa);
   var temAdulto = gfs.some(function(g){return g.faixa==='adult' || g.faixa==='elderly';});
   var temCrianca = gfs.some(function(g){return g.faixa==='child' || g.faixa==='baby/toddler';});
   if(temAdulto && temCrianca){
-    return ' The adult has mature adult body proportions and is clearly taller than the child, who reaches only to the adult\'s waist or hip level.';
+    return ' The adult has mature adult body proportions, adult height and adult clothing (no school uniform, no plaid skirt, no knee socks, no schoolgirl outfit), and is clearly taller than the child, who reaches only to the adult\'s waist or hip level. The adult is a real grown-up parent, not a teenager.';
   }
   return '';
 }
