@@ -2239,9 +2239,39 @@ async function gerarCenas(){
   await ativarEtapa('e2');
 
   // ETAPA 2: Gera cenas 1 por vez com retry automatico em caso de falha
+  // Sessão 5 (28/04): após a 1ª página com sucesso, extrai wardrobe + features
+  // via Claude Haiku e popula ST.lockData. Páginas 2-N usam esse lock para
+  // garantir consistência visual (mesma roupa, mesmos olhos, mesmo cabelo).
+  ST.lockData = null;
   for(var b=0;b<paginas.length;b++){
     var resultado=await gerarCenaPaginaComRetry(paginas[b],b);
     POS.cenasGeradas.push(resultado);
+
+    // Após a 1ª cena com sucesso, extrai lock pra páginas seguintes
+    if(b === 0 && resultado && resultado.url && !resultado.erro && !ST.lockData){
+      try{
+        // parsNaPg da página 1: protagonista + (até 1 secundário com foto)
+        var personagensVisuaisP1 = (function(){
+          var visuais = [];
+          var prot = ST.personagens.filter(function(p){return p.papel==='protagonista';})[0] || ST.personagens[0];
+          if(prot) visuais.push(prot);
+          var outros = ST.personagens.filter(function(p){return p !== prot && p.nome && p.fotoUrl;});
+          outros.sort(function(a,b){
+            var rank={familiar:0, amigo:1, outro:2};
+            return (rank[a.papel]||3) - (rank[b.papel]||3);
+          });
+          if(outros[0] && visuais.length < 2) visuais.push(outros[0]);
+          return visuais;
+        })();
+        ST.lockData = await extrairLockData(resultado.url, personagensVisuaisP1);
+        if(ST.lockData){
+          logGeracao({tipo:'sessao',status:'lock_extraido',erro_msg:'personagens: '+Object.keys(ST.lockData).join(', ')});
+        }
+      }catch(eL){
+        logGeracao({tipo:'sessao',status:'lock_exception',erro_msg:(eL&&eL.message)||''});
+        // Falhar lock NÃO bloqueia geração — páginas continuam sem lock (degrada para v4 puro)
+      }
+    }
   }
 
   // FIX BUG 1 (CRÍTICO): bloqueio de entrega se QUALQUER cena falhou.
@@ -2496,6 +2526,98 @@ async function gerarDescricaoCenario(texto, titulo, roteiro){
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// SESSÃO 5 (28/04) — Wardrobe lock + Identity lock
+// ════════════════════════════════════════════════════════════════════════════
+// Após gerar a primeira página com sucesso, extraímos via Claude Haiku:
+//   - wardrobe: descrição da roupa de cada personagem na cena
+//   - features: traços físicos distintivos (cor dos olhos, cabelo)
+// Páginas seguintes injetam essa descrição no prompt FLUX.2, garantindo
+// consistência visual entre as 6 páginas.
+//
+// Trade-off: +1 chamada Haiku por livro (~2-3s extra) em troca de eliminar
+// trocas de roupa página a página (problema #1 dos testes anteriores).
+async function extrairLockData(imageUrl, personagens){
+  if(!imageUrl || !personagens || personagens.length === 0) return null;
+  var listaP = personagens.map(function(p){return p.nome;}).join(', ');
+  try{
+    var prompt = 'Look at this children\'s book illustration. The characters are: '+listaP+'.\n'
+      +'For each character, describe their clothing and distinctive physical features so a future image can keep them visually consistent.\n\n'
+      +'Return ONLY valid JSON (no markdown fences, no preamble). Schema:\n'
+      +'{\n'
+      +'  "personagens": [\n'
+      +'    {\n'
+      +'      "nome": "exact name from the list",\n'
+      +'      "wardrobe": "short English description of the outfit, max 20 words. Be specific about colors, patterns, garment types. Example: yellow t-shirt with a blue shark print, dark blue denim shorts, white sneakers",\n'
+      +'      "features": "short English description of distinctive features that should stay constant, max 15 words. Focus on eye color, hair color, hair style. Example: short brown hair, big blue eyes, rosy cheeks"\n'
+      +'    }\n'
+      +'  ]\n'
+      +'}\n\n'
+      +'Rules:\n'
+      +'- ONLY include characters from the list above. Do NOT invent or include extra characters.\n'
+      +'- wardrobe must capture EVERY visible garment (top, bottom, shoes, accessories).\n'
+      +'- features focuses ONLY on stable traits (eye color, hair). Do NOT include facial expression or pose.\n'
+      +'- All values in English.';
+
+    var res = await fetch('https://squishbook-backend-v2.onrender.com/api/historia', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 800,
+        messages: [{
+          role: 'user',
+          content: [
+            {type: 'image', source: {type: 'url', url: imageUrl}},
+            {type: 'text', text: prompt}
+          ]
+        }]
+      })
+    });
+    if(!res.ok){
+      logGeracao({tipo:'lock',status:'haiku_fail',erro_msg:'status '+res.status});
+      // Fallback: tenta via /api/historia (text-only)
+      return await extrairLockDataTextOnly(imageUrl, personagens);
+    }
+    var data = await res.json();
+    var txt = data.content && data.content[0] && data.content[0].text;
+    if(!txt){
+      return await extrairLockDataTextOnly(imageUrl, personagens);
+    }
+    txt = txt.trim().replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+    var parsed;
+    try{ parsed = JSON.parse(txt); }catch(e){
+      logGeracao({tipo:'lock',status:'parse_fail',erro_msg:(e&&e.message)||''});
+      return null;
+    }
+    if(!parsed || !Array.isArray(parsed.personagens)) return null;
+    // Mapeia por nome para acesso O(1) depois
+    var mapa = {};
+    parsed.personagens.forEach(function(item){
+      if(item && item.nome){
+        mapa[item.nome] = {
+          wardrobe: (item.wardrobe||'').trim(),
+          features: (item.features||'').trim()
+        };
+      }
+    });
+    logGeracao({tipo:'lock',status:'sucesso',erro_msg:'extraídos '+Object.keys(mapa).length+' personagens'});
+    return mapa;
+  }catch(e){
+    logGeracao({tipo:'lock',status:'exception',erro_msg:(e&&e.message)||''});
+    return null;
+  }
+}
+
+// Fallback: backend pode não suportar imagem multimodal direto. Nesse caso,
+// pulamos a extração e usamos só descrição genérica. Mantém o livro funcionando.
+async function extrairLockDataTextOnly(imageUrl, personagens){
+  // Por enquanto retorna null. Se precisar de fallback inteligente,
+  // dá pra implementar via OCR/CLIP futuramente.
+  logGeracao({tipo:'lock',status:'fallback_null'});
+  return null;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // HELPERS v4 — motor FLUX.2 multi-reference
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -2616,15 +2738,24 @@ function reforcoEscalaV4(personagens){
 
 // Monta o prompt completo para o FLUX.2 [pro] edit.
 // Template validado nos Testes 1, 2, 5 e 6 (6/7 testes passaram; Teste 4B falhou por cenário).
-function construirPromptV4(parsNaPg, cenario, acao, expressao, roteiro, atmosfera){
+// Sessão 5 (28/04): aceita lockData opcional para injetar wardrobe + features
+// extraídos da página 1 (a "página âncora"), garantindo consistência entre páginas.
+function construirPromptV4(parsNaPg, cenario, acao, expressao, roteiro, atmosfera, lockData){
   // @image1 é sempre o protagonista; @image2 (se houver) é o secundário com foto
   var refs = [];
   var imagens = [];
   for(var i=0; i<parsNaPg.length && i<2; i++){
     var p = parsNaPg[i];
     var tag = '@image' + (i+1);
-    refs.push(tag + ' is ' + descricaoPersonagemV4(p));
-    imagens.push(p); // usado depois para montar image_urls[]
+    var desc = descricaoPersonagemV4(p);
+    // Sessão 5: anexa wardrobe + features ao descritor do personagem se houver lock
+    if(lockData && lockData[p.nome]){
+      var lk = lockData[p.nome];
+      if(lk.wardrobe) desc += ', wearing: ' + lk.wardrobe;
+      if(lk.features) desc += ', identifying features: ' + lk.features;
+    }
+    refs.push(tag + ' is ' + desc);
+    imagens.push(p);
   }
 
   var cenaTexto = '';
@@ -2633,8 +2764,6 @@ function construirPromptV4(parsNaPg, cenario, acao, expressao, roteiro, atmosfer
     cenaTexto += acao + '. ';
     cenaTexto += 'Setting: ' + cenario + '. ';
     cenaTexto += refs[0] + '. ';
-    // Sess\u00e3o 3 (24/04): constraint positivo de quantidade exata.
-    // Afirma\u00e7\u00e3o funciona melhor que nega\u00e7\u00e3o em modelos de difus\u00e3o.
     cenaTexto += 'The illustration shows exactly one character, alone in the scene, with an empty and clean background around them. ';
   } else {
     cenaTexto = 'Transform the people from @image1 and @image2 into chibi kawaii watercolor characters together in the same scene. ';
@@ -2642,13 +2771,19 @@ function construirPromptV4(parsNaPg, cenario, acao, expressao, roteiro, atmosfer
     cenaTexto += 'Setting: ' + cenario + '. ';
     cenaTexto += refs.join('. ') + '. ';
     cenaTexto += reforcoEscalaV4(parsNaPg);
-    // Sess\u00e3o 3 (24/04): constraint positivo para evitar personagem fantasma.
-    // Descoberto no teste Beni+Papai (p\u00e1gina 5 gerou menina na cama ao fundo).
+    // Sessão 5: anti-transferência de estampa entre @image1 e @image2
+    cenaTexto += ' Each character keeps their own clothing pattern; do not mix patterns or prints between characters. ';
     cenaTexto += ' The illustration shows exactly these two characters together, alone in the scene, with an empty and clean background around them. ';
   }
 
   cenaTexto += 'Full body visible for all characters, including legs and feet. ';
   cenaTexto += 'Soft pastel watercolor children\'s book illustration, chibi proportions with big glossy eyes and rosy cheeks. ';
+
+  // Sessão 5: se temos lock, reforça consistência explícita
+  if(lockData && Object.keys(lockData).length > 0){
+    cenaTexto += 'IMPORTANT: keep each character\'s outfit and physical features exactly as described above; this scene must be visually consistent with the previous pages of the book. ';
+  }
+
   cenaTexto += atmosfera + '. ';
   cenaTexto += 'No text, no watermark.';
 
@@ -2859,7 +2994,10 @@ async function gerarCenaPagina(pg,idx){
   }
 
   // ── Montar prompt FLUX.2 ───────────────────────────────────────────────
-  var prompt = construirPromptV4(parsNaPg, cenario, acaoConjunta, expressao, roteiro, atmosfera);
+  // ── Montar prompt FLUX.2 ───────────────────────────────────────────────
+  // Sessão 5 (28/04): ST.lockData é populado após a 1ª página gerar com sucesso,
+  // ancorando wardrobe + features dos personagens nas páginas 2-N.
+  var prompt = construirPromptV4(parsNaPg, cenario, acaoConjunta, expressao, roteiro, atmosfera, ST.lockData);
 
   // ── Chamar FLUX.2 [pro] edit ───────────────────────────────────────────
   var ctrl = new AbortController();
