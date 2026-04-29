@@ -2237,9 +2237,19 @@ async function gerarCenas(){
         var gf = detectaGeneroFaixa(p);
         var tipoPessoa;
         if(gf.faixa==='baby/toddler') tipoPessoa = gf.genero==='female' ? 'a small toddler girl' : 'a small toddler boy';
-        else if(gf.faixa==='child') tipoPessoa = gf.genero==='female' ? 'a young girl' : 'a young boy';
+        else if(gf.faixa==='child') tipoPessoa = gf.genero==='female' ? 'a young girl about 6 years old' : 'a young boy about 6 years old';
         else if(gf.faixa==='teenager') tipoPessoa = gf.genero==='female' ? 'a teenage girl' : 'a teenage boy';
-        else tipoPessoa = gf.genero==='female' ? 'an adult woman with mature adult features and adult body proportions' : 'an adult man with mature adult features and adult body proportions';
+        else tipoPessoa = gf.genero==='female' ? 'a grown adult woman aged 30 to 40, with mature adult facial features (defined cheekbones, slim adult jawline, NOT a round childlike face), tall slim adult body proportions, NOT a teenager, NOT a schoolgirl' : 'a grown adult man aged 30 to 40, with mature adult facial features and tall adult body proportions';
+
+        // Sessão 6 patch (28/04 23:50): reforço de escala para adultos.
+        // Problema observado no PDF de 23:43: chibi adulto saiu com proporção de criança,
+        // gerando p\u00e1ginas onde a M\u00e3e parece adolescente ou menor que o filho (p\u00e1g 6).
+        // Solu\u00e7\u00e3o: pedir explicitamente "modified chibi adult" \u2014 o estilo aquarela do livro,
+        // mas com altura/cabe\u00e7a/corpo de adulto. N\u00e3o \u00e9 chibi puro.
+        var modifierProp = '';
+        if(gf.faixa==='adult' || gf.faixa==='elderly'){
+          modifierProp = ' Modified chibi proportions for adult: large expressive eyes and rosy cheeks (chibi style), BUT body and head ratio of an adult human (head smaller than chibi child, body length of an adult, longer legs, taller frame). The character must read clearly as an adult woman/man, not a child.';
+        }
 
         // Prompt LIMPO: fundo neutro, pose neutra, full body, sem ação
         var promptChibi = 'Transform the person from @image1 into a chibi kawaii watercolor character. '
@@ -2247,8 +2257,9 @@ async function gerarCenas(){
           + 'Standing in a neutral straight pose, facing the viewer, arms relaxed at sides, gentle natural smile. '
           + 'Full body visible from head to feet, centered in the image. '
           + 'Plain soft pastel cream background, no scenery, no props, no other characters, no text. '
-          + 'Soft watercolor children\'s book illustration, chibi proportions with big glossy eyes and rosy cheeks, '
-          + 'consistent character reference sheet style. No text, no watermark.';
+          + 'Soft watercolor children\'s book illustration with chibi face style (big glossy eyes, rosy cheeks).'
+          + modifierProp
+          + ' Consistent character reference sheet style. No text, no watermark.';
 
         var ctrlChibi = new AbortController();
         var tmoutChibi = setTimeout(function(){ctrlChibi.abort();}, 90000);
@@ -2794,17 +2805,18 @@ function descricaoPersonagemV4(p){
   var gf = detectaGeneroFaixa(p);
   var base = '';
   if(gf.faixa==='baby/toddler') base = gf.genero==='female' ? 'a baby girl' : 'a baby boy';
-  else if(gf.faixa==='child') base = gf.genero==='female' ? 'a young girl' : 'a young boy';
+  else if(gf.faixa==='child') base = gf.genero==='female' ? 'a young girl about 6 years old, small chibi child proportions' : 'a young boy about 6 years old, small chibi child proportions';
   else if(gf.faixa==='teenager') base = gf.genero==='female' ? 'a teenage girl' : 'a teenage boy';
-  else if(gf.faixa==='adult') base = gf.genero==='female' ? 'a grown adult woman with mature adult facial features and a fully adult body, NOT a teenager, NOT a child' : 'a grown adult man with mature adult facial features and a fully adult body, NOT a teenager';
-  else if(gf.faixa==='elderly') base = gf.genero==='female' ? 'an elderly woman' : 'an elderly man';
+  // Sessão 6 patch (28/04 23:50): adulto com proporção explícita e idade quantificada.
+  else if(gf.faixa==='adult') base = gf.genero==='female' ? 'a grown adult woman aged 30 to 40 with mature adult facial features (defined cheekbones, slim adult jawline) and tall adult body proportions (longer legs and torso than a child), clearly NOT a teenager, NOT a schoolgirl, NOT a child' : 'a grown adult man aged 30 to 40 with mature adult facial features and tall adult body proportions, NOT a teenager';
+  else if(gf.faixa==='elderly') base = gf.genero==='female' ? 'an elderly woman with adult body proportions' : 'an elderly man with adult body proportions';
   else base = gf.genero==='female' ? 'a female person' : 'a male person';
 
   // Adiciona papel se for familiar/amigo (contexto que ajuda o modelo)
   var papel = '';
   if(p.papel==='familiar'){
-    if(gf.faixa==='adult' && gf.genero==='female') papel=' (a real mother, adult age 30 to 40)';
-    else if(gf.faixa==='adult' && gf.genero==='male') papel=' (a real father, adult age 30 to 40)';
+    if(gf.faixa==='adult' && gf.genero==='female') papel=' (a real mother, adult age 30 to 40, clearly an adult, taller than a child)';
+    else if(gf.faixa==='adult' && gf.genero==='male') papel=' (a real father, adult age 30 to 40, clearly an adult, taller than a child)';
     else if(gf.faixa==='elderly' && gf.genero==='female') papel=' (a grandmother)';
     else if(gf.faixa==='elderly' && gf.genero==='male') papel=' (a grandfather)';
   }
@@ -2821,7 +2833,11 @@ function reforcoEscalaV4(personagens){
   var temAdulto = gfs.some(function(g){return g.faixa==='adult' || g.faixa==='elderly';});
   var temCrianca = gfs.some(function(g){return g.faixa==='child' || g.faixa==='baby/toddler';});
   if(temAdulto && temCrianca){
-    return ' The adult has mature adult body proportions, adult height and adult clothing (no school uniform, no plaid skirt, no knee socks, no schoolgirl outfit), and is clearly taller than the child, who reaches only to the adult\'s waist or hip level. The adult is a real grown-up parent, not a teenager.';
+    // Sessão 6 patch (28/04 23:50): reforço duplicado e mais agressivo.
+    // Problema observado: em algumas páginas (especialmente as últimas) o adulto
+    // aparece com altura igual ou menor que a criança. Solução: ancorar altura
+    // numericamente E repetir três vezes em formas diferentes.
+    return ' SCALE RULE (CRITICAL): The adult must be visibly taller than the child. The child\'s head must reach approximately the adult\'s chest or shoulder, NOT the adult\'s head. The adult\'s body is significantly longer than the child\'s body. Adult body proportions: longer legs, longer torso, smaller head-to-body ratio than a child. The adult has mature adult facial features (defined jawline, refined nose, NOT a round childlike face), adult clothing (no school uniform, no plaid skirt, no knee socks, no schoolgirl outfit), and is a real grown-up parent, not a teenager. If the scene shows them side by side, the height difference must be obvious and the adult must dominate vertically.';
   }
   return '';
 }
