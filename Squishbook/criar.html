@@ -2205,6 +2205,96 @@ async function gerarCenas(){
     await Promise.all(avPromises);
   }
 
+  // ════════════════════════════════════════════════════════════════════════════
+  // SESSÃO 6 (28/04 noite) — Avatar chibi canônico como âncora de identidade
+  // ════════════════════════════════════════════════════════════════════════════
+  // Problema observado no PDF de 28/04 (Sessão 5 ativa):
+  //   Beni aparece como "6 pessoas diferentes" entre as 6 páginas. Wardrobe lock
+  //   resolve roupa, mas identidade flutua porque FLUX.2 reinterpreta a foto
+  //   realista a cada chamada (cena dinâmica, ação descrita, etc).
+  //
+  // Solução:
+  //   Antes de gerar capa+páginas, criar 1 avatar chibi LIMPO de cada personagem
+  //   com foto (fundo neutro, pose neutra, sem ação, sem cenário). Esse avatar
+  //   chibi vira a referência canônica nas chamadas seguintes — FLUX.2 vê o
+  //   mesmo avatar 7 vezes (capa + 6 páginas) ao invés da foto realista, e a
+  //   reinterpretação cai drasticamente.
+  //
+  // Trade-off: +1 chamada FLUX.2 por personagem com foto (~$0.04 cada,
+  //            ~15-25s extra na espera total) em troca de identidade estável.
+  // Fallback: se chibi falhar, cena cai pra fotoUrl original (Sessão 5 puro).
+  console.log('[Sessão 6] iniciando geração de avatares chibi canônicos');
+  var personagensComFoto = ST.personagens.filter(function(p){return p.fotoUrl && !p.chibiAvatarUrl;});
+  if(personagensComFoto.length > 0){
+    var chibiPromises = personagensComFoto.map(async function(p){
+      try{
+        var fotoBase = await fotoParaDataUrl(p.fotoUrl);
+        if(!fotoBase){
+          console.warn('[Sessão 6] '+p.nome+': fotoParaDataUrl retornou null');
+          return;
+        }
+        // Determina gênero/idade pra ancorar prompt
+        var gf = detectaGeneroFaixa(p);
+        var tipoPessoa;
+        if(gf.faixa==='baby/toddler') tipoPessoa = gf.genero==='female' ? 'a small toddler girl' : 'a small toddler boy';
+        else if(gf.faixa==='child') tipoPessoa = gf.genero==='female' ? 'a young girl' : 'a young boy';
+        else if(gf.faixa==='teenager') tipoPessoa = gf.genero==='female' ? 'a teenage girl' : 'a teenage boy';
+        else tipoPessoa = gf.genero==='female' ? 'an adult woman with mature adult features and adult body proportions' : 'an adult man with mature adult features and adult body proportions';
+
+        // Prompt LIMPO: fundo neutro, pose neutra, full body, sem ação
+        var promptChibi = 'Transform the person from @image1 into a chibi kawaii watercolor character. '
+          + 'The character is ' + tipoPessoa + ', preserve face features and identity exactly from the photo. '
+          + 'Standing in a neutral straight pose, facing the viewer, arms relaxed at sides, gentle natural smile. '
+          + 'Full body visible from head to feet, centered in the image. '
+          + 'Plain soft pastel cream background, no scenery, no props, no other characters, no text. '
+          + 'Soft watercolor children\'s book illustration, chibi proportions with big glossy eyes and rosy cheeks, '
+          + 'consistent character reference sheet style. No text, no watermark.';
+
+        var ctrlChibi = new AbortController();
+        var tmoutChibi = setTimeout(function(){ctrlChibi.abort();}, 90000);
+        var t0c = Date.now();
+        var resChibi = await fetch('https://squishbook-backend-v2.onrender.com/api/avatar', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({
+            model: MOTOR_V4,
+            payload: {
+              prompt: promptChibi,
+              image_urls: [fotoBase],
+              image_size: 'portrait_4_3'
+            }
+          }),
+          signal: ctrlChibi.signal
+        });
+        clearTimeout(tmoutChibi);
+        var dataChibi = await resChibi.json();
+        var chibiUrl = dataChibi.images && dataChibi.images[0] && dataChibi.images[0].url;
+
+        if(chibiUrl){
+          // Converte pra data URL imediatamente (URLs do fal.ai expiram)
+          try{
+            var chibiBase = await fotoParaDataUrl(chibiUrl);
+            p.chibiAvatarUrl = chibiBase || chibiUrl;
+            console.log('[Sessão 6] ✅ chibi gerado para '+p.nome+' em '+(Date.now()-t0c)+'ms');
+            logGeracao({tipo:'chibi_avatar', status:'sucesso', duracao_ms:Date.now()-t0c, erro_msg:p.nome});
+          }catch(eDl){
+            // Se falhar download, usa URL direta (vai expirar mas funciona pra próximas chamadas imediatas)
+            p.chibiAvatarUrl = chibiUrl;
+            console.warn('[Sessão 6] chibi gerado mas falhou download base64, usando URL direta:', eDl.message);
+          }
+        } else {
+          console.warn('[Sessão 6] chibi falhou para '+p.nome+': status '+resChibi.status);
+          logGeracao({tipo:'chibi_avatar', status:'flux_falhou', erro_msg:p.nome+' status '+resChibi.status});
+        }
+      }catch(eC){
+        console.error('[Sessão 6] exception chibi '+p.nome+':', eC && eC.message);
+        logGeracao({tipo:'chibi_avatar', status:'exception', erro_msg:(p.nome||'?')+' '+((eC&&eC.message)||'')});
+      }
+    });
+    await Promise.all(chibiPromises);
+    var chibiOk = personagensComFoto.filter(function(p){return p.chibiAvatarUrl;}).length;
+    console.log('[Sessão 6] chibi avatars prontos: '+chibiOk+'/'+personagensComFoto.length);
+  }
+
   // Determina número de páginas: 12 para impresso, 6 para digital
   var totalPaginasAlvo = (ST.formato==='impresso') ? 12 : 6;
   var paginas=[];
@@ -2558,54 +2648,38 @@ async function extrairLockData(imageUrl, personagens){
       +'- features focuses ONLY on stable traits (eye color, hair). Do NOT include facial expression or pose.\n'
       +'- All values in English.';
 
-    // SESSÃO 5 patch (28/04 noite): chamada ao endpoint dedicado /api/extrair-lock.
-    // Antes: /api/historia com {type:'image', source:{type:'url'}} — Anthropic falhava
-    //   silenciosamente ao baixar URLs do fal.ai.
-    // Agora: backend baixa a imagem, converte pra base64 e chama Anthropic no formato
-    //   canônico. Erros viram visíveis no console do navegador.
-    console.log('[Sessão 5] iniciando extração lock para', personagens.length, 'personagem(s)');
-    var res;
-    try{
-      res = await fetch('https://squishbook-backend-v2.onrender.com/api/extrair-lock', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({
-          imageUrl: imageUrl,
-          prompt: prompt,
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 800
-        })
-      });
-    }catch(eFetch){
-      console.error('[Sessão 5] fetch falhou (rede/timeout):', eFetch && eFetch.message);
-      logGeracao({tipo:'lock',status:'fetch_fail',erro_msg:(eFetch&&eFetch.message)||''});
-      return null;
-    }
+    var res = await fetch('https://squishbook-backend-v2.onrender.com/api/historia', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 800,
+        messages: [{
+          role: 'user',
+          content: [
+            {type: 'image', source: {type: 'url', url: imageUrl}},
+            {type: 'text', text: prompt}
+          ]
+        }]
+      })
+    });
     if(!res.ok){
-      var errBody = '';
-      try{ errBody = await res.text(); }catch(e){}
-      console.error('[Sessão 5] /api/extrair-lock retornou', res.status, errBody.substring(0,300));
-      logGeracao({tipo:'lock',status:'haiku_fail',erro_msg:'status '+res.status+' '+errBody.substring(0,200)});
-      return null;
+      logGeracao({tipo:'lock',status:'haiku_fail',erro_msg:'status '+res.status});
+      // Fallback: tenta via /api/historia (text-only)
+      return await extrairLockDataTextOnly(imageUrl, personagens);
     }
     var data = await res.json();
     var txt = data.content && data.content[0] && data.content[0].text;
     if(!txt){
-      console.warn('[Sessão 5] resposta sem text:', JSON.stringify(data).substring(0,200));
-      logGeracao({tipo:'lock',status:'sem_texto'});
-      return null;
+      return await extrairLockDataTextOnly(imageUrl, personagens);
     }
     txt = txt.trim().replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
     var parsed;
     try{ parsed = JSON.parse(txt); }catch(e){
-      console.error('[Sessão 5] parse JSON falhou:', e.message, 'txt:', txt.substring(0,200));
       logGeracao({tipo:'lock',status:'parse_fail',erro_msg:(e&&e.message)||''});
       return null;
     }
-    if(!parsed || !Array.isArray(parsed.personagens)){
-      console.warn('[Sessão 5] JSON sem array personagens:', JSON.stringify(parsed).substring(0,200));
-      return null;
-    }
+    if(!parsed || !Array.isArray(parsed.personagens)) return null;
     // Mapeia por nome para acesso O(1) depois
     var mapa = {};
     parsed.personagens.forEach(function(item){
@@ -2616,11 +2690,9 @@ async function extrairLockData(imageUrl, personagens){
         };
       }
     });
-    console.log('[Sessão 5] ✅ lock extraído:', mapa);
     logGeracao({tipo:'lock',status:'sucesso',erro_msg:'extraídos '+Object.keys(mapa).length+' personagens'});
     return mapa;
   }catch(e){
-    console.error('[Sessão 5] exception:', e && e.message);
     logGeracao({tipo:'lock',status:'exception',erro_msg:(e&&e.message)||''});
     return null;
   }
@@ -2993,13 +3065,15 @@ async function gerarCenaPagina(pg,idx){
 
   // ── Converter fotos originais em data URLs ─────────────────────────────
   // FLUX.2 aceita data URL em image_urls[]. Sem upload intermediário.
+  // SESSÃO 6 (28/04 noite): prioridade nova é chibiAvatarUrl > fotoUrl > avatarUrl.
+  // Avatar chibi canônico foi gerado em ETAPA 1.5 e ancora identidade visual.
+  // Foto original cai como fallback (se chibi falhou).
   var imageUrls = [];
   for(var k=0; k<parsNaPg.length; k++){
     var pk = parsNaPg[k];
-    // Prioridade: foto original > avatar chibi já gerado
-    var fonte = pk.fotoUrl || pk.avatarUrl;
+    var fonte = pk.chibiAvatarUrl || pk.fotoUrl || pk.avatarUrl;
     if(!fonte){
-      logGeracao({tipo:'cena',cena_idx:idx,status:'sem_foto',erro_msg:'personagem '+pk.nome+' sem fotoUrl nem avatarUrl'});
+      logGeracao({tipo:'cena',cena_idx:idx,status:'sem_foto',erro_msg:'personagem '+pk.nome+' sem chibi nem foto'});
       continue;
     }
     var dataUrl = await fotoParaDataUrl(fonte);
@@ -3569,10 +3643,12 @@ async function gerarPDFReal(){
   // Usa foto ORIGINAL do protagonista como refer\u00eancia (n\u00e3o avatar chibi),
   // porque FLUX.2 faz a transforma\u00e7\u00e3o chibi sozinho e resulta em qualidade superior.
   var protCapa = ST.personagens[0];
-  if(protCapa && protCapa.fotoUrl){
+  if(protCapa && (protCapa.chibiAvatarUrl || protCapa.fotoUrl)){
     try{
-      // Converte foto original para data URL (reusa helper do miolo)
-      var fotoProtUrl = await fotoParaDataUrl(protCapa.fotoUrl);
+      // SESSÃO 6 (28/04 noite): prioriza chibi canônico sobre foto realista
+      // pra que rosto da capa case com rosto das páginas internas.
+      var fonteCapa = protCapa.chibiAvatarUrl || protCapa.fotoUrl;
+      var fotoProtUrl = await fotoParaDataUrl(fonteCapa);
 
       if(fotoProtUrl){
         // Descri\u00e7\u00e3o do protagonista com g\u00eanero/idade ancorados (mesmo padr\u00e3o do miolo)
