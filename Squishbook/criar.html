@@ -2558,38 +2558,54 @@ async function extrairLockData(imageUrl, personagens){
       +'- features focuses ONLY on stable traits (eye color, hair). Do NOT include facial expression or pose.\n'
       +'- All values in English.';
 
-    var res = await fetch('https://squishbook-backend-v2.onrender.com/api/historia', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 800,
-        messages: [{
-          role: 'user',
-          content: [
-            {type: 'image', source: {type: 'url', url: imageUrl}},
-            {type: 'text', text: prompt}
-          ]
-        }]
-      })
-    });
+    // SESSÃO 5 patch (28/04 noite): chamada ao endpoint dedicado /api/extrair-lock.
+    // Antes: /api/historia com {type:'image', source:{type:'url'}} — Anthropic falhava
+    //   silenciosamente ao baixar URLs do fal.ai.
+    // Agora: backend baixa a imagem, converte pra base64 e chama Anthropic no formato
+    //   canônico. Erros viram visíveis no console do navegador.
+    console.log('[Sessão 5] iniciando extração lock para', personagens.length, 'personagem(s)');
+    var res;
+    try{
+      res = await fetch('https://squishbook-backend-v2.onrender.com/api/extrair-lock', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          imageUrl: imageUrl,
+          prompt: prompt,
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 800
+        })
+      });
+    }catch(eFetch){
+      console.error('[Sessão 5] fetch falhou (rede/timeout):', eFetch && eFetch.message);
+      logGeracao({tipo:'lock',status:'fetch_fail',erro_msg:(eFetch&&eFetch.message)||''});
+      return null;
+    }
     if(!res.ok){
-      logGeracao({tipo:'lock',status:'haiku_fail',erro_msg:'status '+res.status});
-      // Fallback: tenta via /api/historia (text-only)
-      return await extrairLockDataTextOnly(imageUrl, personagens);
+      var errBody = '';
+      try{ errBody = await res.text(); }catch(e){}
+      console.error('[Sessão 5] /api/extrair-lock retornou', res.status, errBody.substring(0,300));
+      logGeracao({tipo:'lock',status:'haiku_fail',erro_msg:'status '+res.status+' '+errBody.substring(0,200)});
+      return null;
     }
     var data = await res.json();
     var txt = data.content && data.content[0] && data.content[0].text;
     if(!txt){
-      return await extrairLockDataTextOnly(imageUrl, personagens);
+      console.warn('[Sessão 5] resposta sem text:', JSON.stringify(data).substring(0,200));
+      logGeracao({tipo:'lock',status:'sem_texto'});
+      return null;
     }
     txt = txt.trim().replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
     var parsed;
     try{ parsed = JSON.parse(txt); }catch(e){
+      console.error('[Sessão 5] parse JSON falhou:', e.message, 'txt:', txt.substring(0,200));
       logGeracao({tipo:'lock',status:'parse_fail',erro_msg:(e&&e.message)||''});
       return null;
     }
-    if(!parsed || !Array.isArray(parsed.personagens)) return null;
+    if(!parsed || !Array.isArray(parsed.personagens)){
+      console.warn('[Sessão 5] JSON sem array personagens:', JSON.stringify(parsed).substring(0,200));
+      return null;
+    }
     // Mapeia por nome para acesso O(1) depois
     var mapa = {};
     parsed.personagens.forEach(function(item){
@@ -2600,9 +2616,11 @@ async function extrairLockData(imageUrl, personagens){
         };
       }
     });
+    console.log('[Sessão 5] ✅ lock extraído:', mapa);
     logGeracao({tipo:'lock',status:'sucesso',erro_msg:'extraídos '+Object.keys(mapa).length+' personagens'});
     return mapa;
   }catch(e){
+    console.error('[Sessão 5] exception:', e && e.message);
     logGeracao({tipo:'lock',status:'exception',erro_msg:(e&&e.message)||''});
     return null;
   }
