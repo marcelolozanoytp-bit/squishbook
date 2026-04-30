@@ -2252,8 +2252,14 @@ async function gerarCenas(){
         }
 
         // Prompt LIMPO: fundo neutro, pose neutra, full body, sem ação
+        // Sessão 6 patch v3 (29/04 23:30): instrução NEUTRA pra cor real dos olhos.
+        // Bug observado: capa veio com olho castanho ainda que a foto mostre olho claro
+        // azul-acinzentado. Causa: prompt sem âncora forte deixava o modelo
+        // escolher um castanho "default chibi". Solução: ordem direta de OBSERVAR
+        // a foto e reproduzir a cor exata, qualquer que seja ela.
         var promptChibi = 'Transform the person from @image1 into a chibi kawaii watercolor character. '
           + 'The character is ' + tipoPessoa + ', preserve face features and identity exactly from the photo. '
+          + 'EYE COLOR INSTRUCTION (CRITICAL): carefully examine the actual iris color of the person\'s eyes in the reference photo @image1, then reproduce EXACTLY that same iris color in the chibi character\'s eyes. The chibi eyes are stylized large and glossy, BUT the iris color must match the photo precisely whether the photo shows blue, gray, green, hazel, brown, or any other natural eye color. Do not invent a different eye color. Do not pick a default. Match the photo. '
           + 'Standing in a neutral straight pose, facing the viewer, arms relaxed at sides, gentle natural smile. '
           + 'Full body visible from head to feet, centered in the image. '
           + 'Plain soft pastel cream background, no scenery, no props, no other characters, no text. '
@@ -2820,7 +2826,7 @@ function descricaoPersonagemV4(p){
     else if(gf.faixa==='elderly' && gf.genero==='female') papel=' (a grandmother)';
     else if(gf.faixa==='elderly' && gf.genero==='male') papel=' (a grandfather)';
   }
-  return base + papel + ', preserve face and features exactly';
+  return base + papel + ', preserve face and features exactly including the natural iris eye color shown in the reference photo (match the photo eye color whether blue, gray, green, hazel or brown, do not invent a different color)';
 }
 
 // Detecta se a cena precisa de reforço de escala (adulto + criança juntos).
@@ -3676,8 +3682,12 @@ async function gerarPDFReal(){
         else tipoCapa = gfCapa.genero==='female' ? 'a young girl' : 'a young boy';
 
         // Prompt de capa: composi\u00e7\u00e3o retrato, personagem centralizado, fundo tem\u00e1tico
+        // Prompt de capa: composição retrato, personagem centralizado, fundo temático
+        // Sessão 6 patch v3 (29/04 23:30): instrução neutra pra cor real dos olhos
+        // (capa estava saindo com olho castanho default contra foto de olho claro).
         var promptCapaV4 = 'Transform the person from @image1 into a chibi kawaii watercolor character for a children\'s book cover. '
           + 'The character is ' + tipoCapa + ', preserve face and features exactly. '
+          + 'EYE COLOR (CRITICAL): examine the actual iris color in the reference photo @image1 and reproduce EXACTLY that same iris color in the chibi. Match the photo whether eyes are blue, gray, green, hazel, or brown. Do not pick a default. Do not invent a color. '
           + 'Portrait composition: character centered in the image, facing the viewer, '
           + 'with a big joyful smile and arms open wide in a welcoming pose. '
           + 'Character fills the center and upper half of the image. '
