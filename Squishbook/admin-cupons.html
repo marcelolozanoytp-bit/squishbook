@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Squishbook — Admin Cupons</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Baloo+2:wght@700;800;900&family=Fraunces:opsz,wght@9..144,400;9..144,700;9..144,900&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --roxo:#7C3AED;--roxo-cl:#EDE9FE;
+  --rosa:#E8527A;--rosa-coral:#FF6B9D;
+  --amarelo:#FFCD3C;--verde:#10B981;
+  --vermelho:#dc2626;
+  --creme:#FFFBF5;--branco:#FFFFFF;
+  --texto:#180F2E;--texto-sec:#6B5E8A;
+  --borda:#EDE8F8;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  font-family:'Nunito',sans-serif;color:var(--texto);
+  background:var(--creme);
+  min-height:100vh;
+  padding:24px 16px;
+}
+.wrap{max-width:1100px;margin:0 auto}
+
+/* Login */
+.login-box{
+  max-width:420px;margin:120px auto 0;
+  background:white;border-radius:24px;
+  padding:40px 32px;text-align:center;
+  box-shadow:0 20px 50px rgba(124,58,237,.15);
+}
+.login-box h1{
+  font-family:'Fraunces',serif;font-weight:900;
+  font-size:1.6rem;margin-bottom:8px;
+}
+.login-box p{color:var(--texto-sec);margin-bottom:24px;font-size:.95rem}
+.login-box input{
+  width:100%;padding:14px 16px;
+  border:2px solid var(--borda);border-radius:12px;
+  font-size:1rem;font-family:inherit;
+  margin-bottom:14px;
+}
+.login-box input:focus{outline:none;border-color:var(--roxo)}
+.login-box button{
+  width:100%;padding:14px;
+  background:linear-gradient(135deg,var(--rosa-coral),var(--roxo));
+  color:white;border:none;border-radius:12px;
+  font-family:'Baloo 2',cursive;font-weight:800;font-size:1rem;
+  cursor:pointer;
+}
+.login-erro{
+  background:rgba(220,38,38,.08);
+  color:var(--vermelho);
+  padding:10px;border-radius:10px;
+  font-size:.88rem;margin-bottom:14px;
+  display:none;
+}
+.login-erro.show{display:block}
+
+/* Header */
+.header{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:16px 24px;background:white;
+  border-radius:18px;
+  box-shadow:0 8px 22px rgba(124,58,237,.08);
+  margin-bottom:24px;
+}
+.header h1{
+  font-family:'Fraunces',serif;font-weight:900;
+  font-size:1.4rem;
+}
+.header h1 .icon{margin-right:8px}
+.btn-novo{
+  padding:12px 22px;
+  background:linear-gradient(135deg,var(--rosa-coral),var(--roxo));
+  color:white;border:none;border-radius:12px;
+  font-family:'Baloo 2',cursive;font-weight:800;font-size:.95rem;
+  cursor:pointer;display:flex;align-items:center;gap:6px;
+}
+.btn-novo:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(232,82,122,.3)}
+
+/* Cards */
+.cupons-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
+  gap:18px;
+}
+.cupom-card{
+  background:white;border-radius:18px;
+  padding:20px;
+  box-shadow:0 8px 22px rgba(124,58,237,.08);
+  position:relative;
+  transition:transform .2s, box-shadow .2s;
+}
+.cupom-card.inativo{opacity:.55}
+.cupom-card.expirado{border:2px dashed var(--vermelho)}
+.cupom-card:hover{transform:translateY(-3px);box-shadow:0 14px 32px rgba(124,58,237,.12)}
+.cupom-codigo{
+  font-family:'Baloo 2',cursive;font-weight:900;
+  font-size:1.5rem;letter-spacing:1px;
+  background:linear-gradient(135deg,var(--rosa-coral),var(--roxo));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  margin-bottom:6px;word-break:break-all;
+}
+.cupom-desconto{
+  display:inline-block;
+  background:var(--roxo-cl);color:var(--roxo);
+  padding:4px 12px;border-radius:8px;
+  font-weight:800;font-size:.85rem;
+  margin-bottom:12px;
+}
+.cupom-desconto.full{background:rgba(16,185,129,.15);color:var(--verde)}
+.cupom-descricao{
+  color:var(--texto-sec);font-size:.88rem;
+  line-height:1.5;margin-bottom:14px;
+  min-height:40px;
+}
+.cupom-stats{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
+  background:var(--creme);
+  border-radius:12px;padding:10px;
+  margin-bottom:14px;
+}
+.cupom-stat{text-align:center}
+.cupom-stat-label{
+  font-size:.7rem;color:var(--texto-sec);
+  text-transform:uppercase;letter-spacing:.5px;
+}
+.cupom-stat-value{
+  font-family:'Baloo 2',cursive;font-weight:800;
+  font-size:1.05rem;color:var(--texto);
+}
+.cupom-meta{
+  font-size:.78rem;color:var(--texto-sec);
+  margin-bottom:14px;line-height:1.5;
+}
+.cupom-status-badge{
+  display:inline-block;padding:3px 10px;
+  border-radius:8px;font-size:.75rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:.5px;
+}
+.cupom-status-badge.ativo{background:rgba(16,185,129,.15);color:var(--verde)}
+.cupom-status-badge.inativo{background:rgba(107,94,138,.15);color:var(--texto-sec)}
+.cupom-status-badge.expirado{background:rgba(220,38,38,.12);color:var(--vermelho)}
+.cupom-acoes{display:flex;gap:8px;flex-wrap:wrap}
+.btn-acao{
+  flex:1;padding:8px;
+  border:none;border-radius:10px;
+  font-family:'Baloo 2',cursive;font-weight:700;font-size:.82rem;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:4px;
+  min-width:70px;
+}
+.btn-toggle{background:var(--roxo-cl);color:var(--roxo)}
+.btn-toggle:hover{background:#DDD6FE}
+.btn-edit{background:rgba(255,205,60,.2);color:#9a7900}
+.btn-edit:hover{background:rgba(255,205,60,.35)}
+.btn-delete{background:rgba(220,38,38,.1);color:var(--vermelho)}
+.btn-delete:hover{background:rgba(220,38,38,.18)}
+
+/* Modal */
+.modal-overlay{
+  display:none;position:fixed;top:0;left:0;right:0;bottom:0;
+  background:rgba(24,15,46,.55);
+  z-index:100;
+  align-items:center;justify-content:center;
+  padding:20px;
+}
+.modal-overlay.show{display:flex}
+.modal{
+  background:white;border-radius:24px;
+  padding:32px;max-width:480px;width:100%;
+  box-shadow:0 30px 70px rgba(0,0,0,.25);
+}
+.modal h2{
+  font-family:'Fraunces',serif;font-weight:900;
+  font-size:1.5rem;margin-bottom:20px;
+}
+.campo{margin-bottom:14px}
+.campo label{
+  display:block;font-weight:700;font-size:.88rem;
+  color:var(--texto-sec);margin-bottom:6px;
+}
+.campo input, .campo textarea{
+  width:100%;padding:12px 14px;
+  border:2px solid var(--borda);border-radius:10px;
+  font-size:.95rem;font-family:inherit;
+}
+.campo input:focus, .campo textarea:focus{outline:none;border-color:var(--roxo)}
+.campo textarea{resize:vertical;min-height:60px}
+.campo-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.modal-acoes{
+  display:flex;gap:10px;margin-top:20px;
+}
+.modal-acoes button{
+  flex:1;padding:12px;
+  border:none;border-radius:12px;
+  font-family:'Baloo 2',cursive;font-weight:800;font-size:.95rem;
+  cursor:pointer;
+}
+.btn-salvar{
+  background:linear-gradient(135deg,var(--rosa-coral),var(--roxo));
+  color:white;
+}
+.btn-cancelar{background:var(--roxo-cl);color:var(--roxo)}
+.modal-erro{
+  background:rgba(220,38,38,.08);color:var(--vermelho);
+  padding:10px;border-radius:10px;font-size:.86rem;
+  margin-bottom:12px;display:none;
+}
+.modal-erro.show{display:block}
+
+/* Loading */
+.loading{
+  text-align:center;padding:60px 20px;
+  color:var(--texto-sec);
+}
+.empty{
+  text-align:center;padding:60px 20px;
+  background:white;border-radius:18px;
+  color:var(--texto-sec);
+}
+.empty-emoji{font-size:3rem;margin-bottom:14px;display:block}
+
+@media(max-width:600px){
+  .header{flex-direction:column;gap:12px;align-items:stretch}
+  .header h1{text-align:center}
+  .cupons-grid{grid-template-columns:1fr}
+  .campo-row{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<div id="loginScreen" class="wrap" style="display:none">
+  <div class="login-box">
+    <h1>🎫 Cupons Squishbook</h1>
+    <p>Painel administrativo. Entre com a senha de admin.</p>
+    <div id="loginErro" class="login-erro"></div>
+    <input type="password" id="inpSenha" placeholder="Senha de admin" autofocus onkeydown="if(event.key==='Enter')entrar()"/>
+    <button onclick="entrar()">Entrar</button>
+  </div>
+</div>
+
+<div id="appScreen" class="wrap" style="display:none">
+  <div class="header">
+    <h1><span class="icon">🎫</span>Cupons Squishbook</h1>
+    <button class="btn-novo" onclick="abrirModalNovo()">+ Novo cupom</button>
+  </div>
+  <div id="lista" class="cupons-grid">
+    <div class="loading">Carregando cupons…</div>
+  </div>
+</div>
+
+<div id="modalOverlay" class="modal-overlay">
+  <div class="modal">
+    <h2 id="modalTitulo">Novo cupom</h2>
+    <div id="modalErro" class="modal-erro"></div>
+    <div class="campo">
+      <label>Código do cupom *</label>
+      <input type="text" id="inpCodigo" placeholder="LANCAMENTO10" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9_-]/g,'')"/>
+    </div>
+    <div class="campo-row">
+      <div class="campo">
+        <label>Desconto (%) *</label>
+        <input type="number" id="inpDesconto" min="1" max="100" placeholder="10"/>
+      </div>
+      <div class="campo">
+        <label>Limite de uso</label>
+        <input type="number" id="inpUsoMax" min="1" placeholder="Ilimitado"/>
+      </div>
+    </div>
+    <div class="campo">
+      <label>Válido até</label>
+      <input type="datetime-local" id="inpValidade"/>
+    </div>
+    <div class="campo">
+      <label>Descrição interna</label>
+      <textarea id="inpDescricao" placeholder="Pra que serve esse cupom?"></textarea>
+    </div>
+    <div class="modal-acoes">
+      <button class="btn-cancelar" onclick="fecharModal()">Cancelar</button>
+      <button class="btn-salvar" onclick="salvarCupom()" id="btnSalvar">Criar cupom</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const BACKEND = 'https://squishbook-backend-v2.onrender.com';
+let senhaAdmin = sessionStorage.getItem('squishbook_admin_key') || '';
+let cupomEditando = null; // null = novo, string = código sendo editado
+
+function escapeHtml(s){
+  return String(s||'').replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+function fmtMoney(n){
+  if(n === null || n === undefined) return 'R$ 0,00';
+  return 'R$ ' + parseFloat(n).toFixed(2).replace('.', ',');
+}
+
+function fmtDateTime(d){
+  if(!d) return '';
+  const date = new Date(d);
+  return date.toLocaleDateString('pt-BR') + ' ' + date.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+}
+
+function fmtDate(d){
+  if(!d) return '';
+  const date = new Date(d);
+  return date.toLocaleDateString('pt-BR');
+}
+
+function isExpirado(c){
+  if(!c.validade_ate) return false;
+  return new Date(c.validade_ate) < new Date();
+}
+
+function isEsgotado(c){
+  if(!c.uso_max) return false;
+  return c.uso_atual >= c.uso_max;
+}
+
+async function entrar(){
+  const senha = document.getElementById('inpSenha').value;
+  const erroEl = document.getElementById('loginErro');
+  if(!senha){
+    erroEl.textContent = 'Digite a senha';
+    erroEl.classList.add('show');
+    return;
+  }
+  // Tenta uma requisição autenticada pra validar
+  try{
+    const r = await fetch(`${BACKEND}/api/admin/cupons`, {
+      headers: {'x-admin-key': senha}
+    });
+    if(r.status === 401){
+      erroEl.textContent = 'Senha incorreta';
+      erroEl.classList.add('show');
+      return;
+    }
+    if(!r.ok){
+      erroEl.textContent = 'Erro de servidor (HTTP ' + r.status + ')';
+      erroEl.classList.add('show');
+      return;
+    }
+    senhaAdmin = senha;
+    sessionStorage.setItem('squishbook_admin_key', senha);
+    mostrarApp();
+    carregarCupons();
+  }catch(e){
+    erroEl.textContent = 'Erro de rede: ' + e.message;
+    erroEl.classList.add('show');
+  }
+}
+
+function mostrarApp(){
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('appScreen').style.display = 'block';
+}
+
+function mostrarLogin(){
+  document.getElementById('loginScreen').style.display = 'block';
+  document.getElementById('appScreen').style.display = 'none';
+  setTimeout(()=> { document.getElementById('inpSenha').focus(); }, 100);
+}
+
+async function carregarCupons(){
+  try{
+    const r = await fetch(`${BACKEND}/api/admin/cupons`, {
+      headers: {'x-admin-key': senhaAdmin}
+    });
+    if(r.status === 401){
+      sessionStorage.removeItem('squishbook_admin_key');
+      senhaAdmin = '';
+      mostrarLogin();
+      return;
+    }
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    const cupons = await r.json();
+    renderCupons(cupons);
+  }catch(e){
+    document.getElementById('lista').innerHTML = `<div class="empty"><span class="empty-emoji">⚠️</span><strong>Erro ao carregar cupons</strong><br><small>${escapeHtml(e.message)}</small></div>`;
+  }
+}
+
+function renderCupons(cupons){
+  const lista = document.getElementById('lista');
+  if(!cupons || !cupons.length){
+    lista.innerHTML = `<div class="empty"><span class="empty-emoji">🎫</span><strong>Nenhum cupom cadastrado</strong><br>Clique em "Novo cupom" pra criar o primeiro.</div>`;
+    return;
+  }
+  // Ordenar: ativos primeiro, depois por uso decrescente
+  cupons.sort((a, b) => {
+    if(a.ativo && !b.ativo) return -1;
+    if(!a.ativo && b.ativo) return 1;
+    return (b.pedidos_pagos || 0) - (a.pedidos_pagos || 0);
+  });
+
+  lista.innerHTML = cupons.map(c => {
+    const expirado = isExpirado(c);
+    const esgotado = isEsgotado(c);
+    const cardClass = !c.ativo ? 'inativo' : (expirado ? 'expirado' : '');
+    const statusBadge = !c.ativo
+      ? '<span class="cupom-status-badge inativo">Pausado</span>'
+      : expirado
+        ? '<span class="cupom-status-badge expirado">Expirado</span>'
+        : esgotado
+          ? '<span class="cupom-status-badge expirado">Esgotado</span>'
+          : '<span class="cupom-status-badge ativo">Ativo</span>';
+
+    const descontoBadgeClass = c.desconto_percent === 100 ? 'cupom-desconto full' : 'cupom-desconto';
+    const usoStr = c.uso_max ? `${c.uso_atual||0}/${c.uso_max}` : `${c.uso_atual||0}/∞`;
+
+    return `
+      <div class="cupom-card ${cardClass}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+          <div class="cupom-codigo">${escapeHtml(c.codigo)}</div>
+          ${statusBadge}
+        </div>
+        <div class="${descontoBadgeClass}">${c.desconto_percent}% OFF${c.desconto_percent === 100 ? ' (grátis)' : ''}</div>
+        <div class="cupom-descricao">${escapeHtml(c.descricao || 'Sem descrição')}</div>
+        <div class="cupom-stats">
+          <div class="cupom-stat">
+            <div class="cupom-stat-label">Usos</div>
+            <div class="cupom-stat-value">${usoStr}</div>
+          </div>
+          <div class="cupom-stat">
+            <div class="cupom-stat-label">Pagos</div>
+            <div class="cupom-stat-value">${c.pedidos_pagos || 0}</div>
+          </div>
+          <div class="cupom-stat">
+            <div class="cupom-stat-label">Receita</div>
+            <div class="cupom-stat-value" style="font-size:.85rem">${fmtMoney(c.receita_gerada)}</div>
+          </div>
+        </div>
+        <div class="cupom-meta">
+          ${c.validade_ate ? `<strong>Expira:</strong> ${fmtDateTime(c.validade_ate)}<br>` : ''}
+          ${c.desconto_dado > 0 ? `<strong>Total descontado:</strong> ${fmtMoney(c.desconto_dado)}<br>` : ''}
+          <strong>Criado:</strong> ${fmtDate(c.criado_em)}
+        </div>
+        <div class="cupom-acoes">
+          <button class="btn-acao btn-toggle" onclick="toggleCupom('${escapeHtml(c.codigo)}', ${!c.ativo})">${c.ativo ? '⏸️ Pausar' : '▶️ Ativar'}</button>
+          <button class="btn-acao btn-edit" onclick="abrirModalEditar('${escapeHtml(c.codigo)}')">✏️ Editar</button>
+          <button class="btn-acao btn-delete" onclick="deletarCupom('${escapeHtml(c.codigo)}')">🗑️</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function abrirModalNovo(){
+  cupomEditando = null;
+  document.getElementById('modalTitulo').textContent = 'Novo cupom';
+  document.getElementById('btnSalvar').textContent = 'Criar cupom';
+  document.getElementById('inpCodigo').value = '';
+  document.getElementById('inpCodigo').disabled = false;
+  document.getElementById('inpDesconto').value = '';
+  document.getElementById('inpUsoMax').value = '';
+  document.getElementById('inpValidade').value = '';
+  document.getElementById('inpDescricao').value = '';
+  document.getElementById('modalErro').classList.remove('show');
+  document.getElementById('modalOverlay').classList.add('show');
+  setTimeout(()=> document.getElementById('inpCodigo').focus(), 100);
+}
+
+async function abrirModalEditar(codigo){
+  // Busca os dados do cupom atual da lista renderizada
+  try{
+    const r = await fetch(`${BACKEND}/api/admin/cupons`, {headers:{'x-admin-key':senhaAdmin}});
+    const cupons = await r.json();
+    const c = cupons.find(x => x.codigo === codigo);
+    if(!c){ alert('Cupom não encontrado'); return; }
+
+    cupomEditando = codigo;
+    document.getElementById('modalTitulo').textContent = 'Editar ' + codigo;
+    document.getElementById('btnSalvar').textContent = 'Salvar alterações';
+    document.getElementById('inpCodigo').value = c.codigo;
+    document.getElementById('inpCodigo').disabled = true; // não pode mudar código
+    document.getElementById('inpDesconto').value = c.desconto_percent;
+    document.getElementById('inpUsoMax').value = c.uso_max || '';
+    document.getElementById('inpValidade').value = c.validade_ate ? c.validade_ate.substring(0,16) : '';
+    document.getElementById('inpDescricao').value = c.descricao || '';
+    document.getElementById('modalErro').classList.remove('show');
+    document.getElementById('modalOverlay').classList.add('show');
+  }catch(e){
+    alert('Erro: ' + e.message);
+  }
+}
+
+function fecharModal(){
+  document.getElementById('modalOverlay').classList.remove('show');
+}
+
+async function salvarCupom(){
+  const codigo = document.getElementById('inpCodigo').value.trim().toUpperCase();
+  const desconto = parseInt(document.getElementById('inpDesconto').value);
+  const usoMax = document.getElementById('inpUsoMax').value;
+  const validade = document.getElementById('inpValidade').value;
+  const descricao = document.getElementById('inpDescricao').value.trim();
+  const erroEl = document.getElementById('modalErro');
+
+  if(!codigo){ erroEl.textContent = 'Código é obrigatório'; erroEl.classList.add('show'); return; }
+  if(isNaN(desconto) || desconto < 1 || desconto > 100){
+    erroEl.textContent = 'Desconto deve ser entre 1 e 100'; erroEl.classList.add('show'); return;
+  }
+
+  const body = {
+    desconto_percent: desconto,
+    descricao: descricao || null,
+    validade_ate: validade ? new Date(validade).toISOString() : null,
+    uso_max: usoMax ? parseInt(usoMax) : null
+  };
+
+  const btn = document.getElementById('btnSalvar');
+  btn.disabled = true; btn.textContent = '⏳ Salvando...';
+
+  try{
+    let r;
+    if(cupomEditando){
+      r = await fetch(`${BACKEND}/api/admin/cupons/${encodeURIComponent(cupomEditando)}`, {
+        method: 'PUT',
+        headers: {'Content-Type':'application/json', 'x-admin-key': senhaAdmin},
+        body: JSON.stringify(body)
+      });
+    } else {
+      body.codigo = codigo;
+      body.ativo = true;
+      r = await fetch(`${BACKEND}/api/admin/cupons`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json', 'x-admin-key': senhaAdmin},
+        body: JSON.stringify(body)
+      });
+    }
+    if(!r.ok){
+      const err = await r.json().catch(()=>({}));
+      throw new Error(err.erro || 'Erro HTTP ' + r.status);
+    }
+    fecharModal();
+    carregarCupons();
+  }catch(e){
+    erroEl.textContent = e.message; erroEl.classList.add('show');
+  }finally{
+    btn.disabled = false;
+    btn.textContent = cupomEditando ? 'Salvar alterações' : 'Criar cupom';
+  }
+}
+
+async function toggleCupom(codigo, novoEstado){
+  try{
+    const r = await fetch(`${BACKEND}/api/admin/cupons/${encodeURIComponent(codigo)}`, {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json', 'x-admin-key': senhaAdmin},
+      body: JSON.stringify({ativo: novoEstado})
+    });
+    if(!r.ok) throw new Error('Erro HTTP ' + r.status);
+    carregarCupons();
+  }catch(e){
+    alert('Erro: ' + e.message);
+  }
+}
+
+async function deletarCupom(codigo){
+  if(!confirm(`Deletar o cupom "${codigo}"?\n\nIsso é permanente. Pedidos antigos que usaram esse cupom continuam no histórico, mas o cupom não poderá ser usado de novo.`)) return;
+  try{
+    const r = await fetch(`${BACKEND}/api/admin/cupons/${encodeURIComponent(codigo)}`, {
+      method: 'DELETE',
+      headers: {'x-admin-key': senhaAdmin}
+    });
+    if(!r.ok) throw new Error('Erro HTTP ' + r.status);
+    carregarCupons();
+  }catch(e){
+    alert('Erro: ' + e.message);
+  }
+}
+
+// Inicializa
+if(senhaAdmin){
+  mostrarApp();
+  carregarCupons();
+} else {
+  mostrarLogin();
+}
+
+// Fecha modal clicando fora
+document.getElementById('modalOverlay').addEventListener('click', e => {
+  if(e.target.id === 'modalOverlay') fecharModal();
+});
+
+// ESC fecha modal
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape' && document.getElementById('modalOverlay').classList.contains('show')){
+    fecharModal();
+  }
+});
+</script>
+
+</body>
+</html>

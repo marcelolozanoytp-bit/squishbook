@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Squishbook — Pagamento confirmado!</title>
+<title>Squishbook — Obrigado!</title>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Baloo+2:wght@700;800;900&family=Fraunces:opsz,wght@9..144,400;9..144,700;9..144,900&display=swap" rel="stylesheet"/>
 <style>
 :root{
@@ -37,14 +37,26 @@ body{
   background:radial-gradient(circle,rgba(255,205,60,.3),transparent 70%);
   border-radius:50%;
 }
-.confete{
-  font-size:4rem;margin-bottom:20px;
-  display:block;
-  animation:pular 1s ease-in-out infinite;
+.emoji-grande{
+  font-size:4rem;margin-bottom:20px;display:block;
+  position:relative;z-index:2;
 }
+.emoji-pular{ animation:pular 1s ease-in-out infinite; }
 @keyframes pular{
   0%,100%{transform:translateY(0) rotate(-5deg)}
   50%{transform:translateY(-10px) rotate(5deg)}
+}
+@keyframes girar{
+  to{transform:rotate(360deg)}
+}
+.spinner{
+  width:60px;height:60px;
+  border:5px solid var(--roxo-cl);
+  border-top-color:var(--roxo);
+  border-radius:50%;
+  animation:girar 1s linear infinite;
+  margin:0 auto 20px;
+  position:relative;z-index:2;
 }
 h1{
   font-family:'Fraunces',serif;font-weight:900;
@@ -64,7 +76,7 @@ h1 .destaque{
   background:var(--creme);
   border:1px dashed var(--borda);
   padding:20px;border-radius:16px;
-  margin-bottom:30px;
+  margin-bottom:24px;
   position:relative;z-index:2;
   text-align:left;
 }
@@ -74,8 +86,16 @@ h1 .destaque{
   display:flex;align-items:center;gap:8px;
 }
 .box-info p{color:var(--texto-sec);font-size:.92rem;line-height:1.5}
+.box-info p strong{color:var(--texto)}
+.box-info .pedido-num{
+  font-family:'Baloo 2',cursive;font-weight:800;
+  background:var(--roxo-cl);color:var(--roxo);
+  padding:4px 10px;border-radius:8px;
+  display:inline-block;font-size:.85rem;
+  letter-spacing:.5px;
+}
 .acoes{
-  display:grid;grid-template-columns:1fr 1fr;gap:14px;
+  display:flex;flex-direction:column;gap:12px;
   margin-bottom:24px;
   position:relative;z-index:2;
 }
@@ -97,9 +117,18 @@ h1 .destaque{
   background:var(--roxo-cl);color:var(--roxo);
 }
 .btn-secundario:hover{transform:translateY(-3px);background:#DDD6FE}
+.btn-pequeno{
+  background:none;color:var(--texto-sec);
+  font-size:.85rem;font-weight:700;
+  padding:10px;text-decoration:underline;
+  cursor:pointer;border:none;
+}
+.btn-pequeno:hover{color:var(--roxo)}
 .dica{
   font-size:.9rem;color:var(--texto-sec);
   position:relative;z-index:2;line-height:1.55;
+  background:rgba(124,58,237,.05);
+  padding:14px;border-radius:12px;
 }
 .dica strong{color:var(--texto)}
 .voltar{
@@ -109,76 +138,301 @@ h1 .destaque{
   position:relative;z-index:2;
 }
 .voltar:hover{text-decoration:underline}
+
+.estado-pendente{
+  background:rgba(255,205,60,.12);
+  border:1.5px solid rgba(255,205,60,.4);
+  border-radius:14px;
+  padding:14px 18px;
+  font-size:.92rem;color:#9a7900;
+  text-align:left;line-height:1.5;
+  position:relative;z-index:2;
+  margin-bottom:24px;
+}
+.estado-pendente strong{color:#7a5d00}
+
+.estado-erro{
+  background:rgba(232,82,122,.08);
+  border:1.5px solid rgba(232,82,122,.3);
+  border-radius:14px;
+  padding:14px 18px;
+  font-size:.92rem;color:var(--rosa);
+  text-align:left;line-height:1.5;
+  position:relative;z-index:2;
+  margin-bottom:24px;
+}
+
+#email-conf{
+  background:rgba(16,185,129,.08);
+  border:1.5px solid rgba(16,185,129,.3);
+  border-radius:14px;
+  padding:14px 18px;
+  font-size:.9rem;color:#0a8060;
+  text-align:left;line-height:1.5;
+  margin-bottom:20px;
+  position:relative;z-index:2;
+}
+
 @media(max-width:560px){
   .card{padding:40px 24px}
   h1{font-size:1.8rem}
-  .acoes{grid-template-columns:1fr}
 }
 </style>
 </head>
 <body>
 
-<div class="card">
-  <span class="confete">🎉</span>
-  <h1>Pagamento <span class="destaque">confirmado!</span></h1>
-  <p class="sub">
-    Pronto! Seu Squishbook está te esperando.
-    Como você quer receber o livro?
-  </p>
-
-  <div class="box-info">
-    <h3>📖 Seu livro está pronto</h3>
-    <p>Se você acabou de criar agora, ele já está no seu navegador (aba anterior). Caso tenha fechado, escolha uma das opções abaixo.</p>
-  </div>
-
-  <div class="acoes">
-    <a href="javascript:baixar()" class="btn btn-primario">
-      📥 Baixar PDF
-    </a>
-    <a href="javascript:enviarEmail()" class="btn btn-secundario">
-      📧 Enviar por email
-    </a>
-  </div>
-
-  <p class="dica">
-    <strong>Dica:</strong> Salve o PDF em mais de um lugar (computador + nuvem) pra não perder.
-    O Squishbook fica disponível para você gerar e baixar quantas vezes quiser dentro de 30 dias.
-  </p>
-
-  <a href="index.html" class="voltar">← Voltar ao início</a>
+<div class="card" id="card">
+  <!-- conteúdo injetado via JS -->
+  <div class="spinner"></div>
+  <h1 style="font-size:1.6rem">Carregando…</h1>
+  <p class="sub">Buscando informações do seu pedido</p>
 </div>
 
 <script>
-// Quando o usuário chegar aqui, tenta recuperar o PDF salvo no localStorage
-// (o criar.html armazena o último livro gerado lá antes do redirect).
-function baixar(){
-  var pdfData = localStorage.getItem('squishbook_ultimo_pdf');
-  var pdfNome = localStorage.getItem('squishbook_ultimo_nome') || 'Squishbook.pdf';
-  if(pdfData){
-    var link = document.createElement('a');
-    link.href = pdfData;
-    link.download = pdfNome;
-    link.click();
-  } else {
-    alert('Não encontramos seu livro neste navegador. Volte para a aba anterior do Squishbook ou crie um novo livro.');
-    window.location.href = 'criar.html';
+const BACKEND = 'https://squishbook-backend-v2.onrender.com';
+const params = new URLSearchParams(window.location.search);
+const PEDIDO_ID = params.get('id') || params.get('external_reference') || params.get('preference_id');
+const ERRO_RETORNO = params.get('erro') === '1' || params.get('status') === 'failure';
+
+const card = document.getElementById('card');
+let pollingTimer = null;
+let tentativas = 0;
+const MAX_TENTATIVAS = 100; // ~5min de polling com 3s de intervalo
+
+function escapeHtml(s){
+  return String(s||'').replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+function maskEmail(email){
+  if(!email) return '';
+  const [user, dom] = email.split('@');
+  if(!dom) return email;
+  const userMasked = user.length <= 2 ? user : user.slice(0,2) + '***';
+  return userMasked + '@' + dom;
+}
+
+async function buscarPedido(id){
+  const r = await fetch(`${BACKEND}/api/status-pedido?id=${encodeURIComponent(id)}`);
+  if(!r.ok) throw new Error('Pedido não encontrado');
+  return r.json();
+}
+
+function renderSemId(){
+  card.innerHTML = `
+    <span class="emoji-grande">🤔</span>
+    <h1>Hmm, faltou um <span class="destaque">detalhe</span></h1>
+    <p class="sub">Não conseguimos identificar seu pedido nessa página. Se você acabou de pagar, volta na aba anterior do Squishbook ou cria um livro novo.</p>
+    <div class="acoes">
+      <a href="criar.html" class="btn btn-primario">✨ Criar um Squishbook</a>
+      <a href="index.html" class="btn btn-secundario">← Voltar ao início</a>
+    </div>
+  `;
+}
+
+function renderErro(msg){
+  card.innerHTML = `
+    <span class="emoji-grande">😕</span>
+    <h1>Algo <span class="destaque">não rolou</span></h1>
+    <p class="sub">${escapeHtml(msg || 'Tivemos um problema buscando seu pedido. Tenta atualizar a página em alguns minutos.')}</p>
+    <div class="acoes">
+      <button onclick="iniciar()" class="btn btn-primario">🔄 Tentar de novo</button>
+      <a href="https://wa.me/5511970944446?text=${encodeURIComponent('Oi! Tive um problema com o pedido ' + (PEDIDO_ID||'?'))}" class="btn btn-secundario" target="_blank">💬 Falar no WhatsApp</a>
+    </div>
+    <a href="index.html" class="voltar">← Voltar ao início</a>
+  `;
+}
+
+function renderPagamentoRecusado(pedido){
+  card.innerHTML = `
+    <span class="emoji-grande">❌</span>
+    <h1>Pagamento <span class="destaque">recusado</span></h1>
+    <p class="sub">Seu cartão foi recusado pelo Mercado Pago. Não se preocupa, isso é comum (pode ser limite, dado errado, etc.). Você pode tentar de novo.</p>
+    <div class="box-info">
+      <h3>📖 Seu livro está reservado</h3>
+      <p>Pedido <span class="pedido-num">${escapeHtml(pedido.numero)}</span> — gerado para <strong>${escapeHtml(pedido.nome_crianca)}</strong>. Quando você completar o pagamento, ele será enviado pro seu email.</p>
+    </div>
+    <div class="acoes">
+      <button onclick="reabrirCheckout()" class="btn btn-primario">💳 Tentar pagamento de novo</button>
+      <a href="https://wa.me/5511970944446?text=${encodeURIComponent('Oi! Meu cartão foi recusado no pedido ' + pedido.numero)}" class="btn btn-secundario" target="_blank">💬 Falar com a gente</a>
+    </div>
+    <a href="index.html" class="voltar">← Voltar ao início</a>
+  `;
+}
+
+function renderAguardando(pedido){
+  const subtitulo = ERRO_RETORNO
+    ? 'Você foi redirecionado mas o pagamento ainda não foi confirmado. Vamos aguardar a confirmação do Mercado Pago.'
+    : 'Estamos confirmando seu pagamento com o Mercado Pago. Isso geralmente leva 10-30 segundos. Não feche essa página.';
+
+  card.innerHTML = `
+    <div class="spinner"></div>
+    <h1>Confirmando seu <span class="destaque">pagamento</span></h1>
+    <p class="sub">${subtitulo}</p>
+    <div class="estado-pendente">
+      ⏳ <strong>Status:</strong> Aguardando confirmação do Mercado Pago.<br>
+      <span style="font-size:.85rem;color:#9a7900">Pedido <span class="pedido-num" style="background:rgba(255,205,60,.2);color:#7a5d00">${escapeHtml(pedido.numero)}</span></span>
+    </div>
+    <div class="dica">
+      <strong>💡 Importante:</strong> assim que o Mercado Pago confirmar, essa página atualiza automaticamente. Se demorar mais de 5 minutos, atualiza a página manualmente.
+    </div>
+  `;
+}
+
+function renderPago(pedido){
+  const emailMsg = pedido.email_enviado_em
+    ? `<div id="email-conf">📧 <strong>Email enviado para ${escapeHtml(maskEmail(pedido.email))}</strong> com o link de download. Verifique sua caixa de entrada e SPAM.</div>`
+    : `<div id="email-conf" style="background:rgba(124,58,237,.08);border-color:rgba(124,58,237,.3);color:var(--roxo)">📧 Estamos enviando seu livro também por email para <strong>${escapeHtml(maskEmail(pedido.email))}</strong>. Pode levar 1-2 min.</div>`;
+
+  card.innerHTML = `
+    <span class="emoji-grande emoji-pular">🎉</span>
+    <h1>Pagamento <span class="destaque">confirmado!</span></h1>
+    <p class="sub">Pronto! Seu Squishbook do(a) <strong>${escapeHtml(pedido.nome_crianca)}</strong> está te esperando.</p>
+
+    ${emailMsg}
+
+    <div class="acoes">
+      <a href="${escapeHtml(pedido.link_pdf)}" target="_blank" class="btn btn-primario" download>
+        📥 Baixar Squishbook em PDF
+      </a>
+      <button onclick="reenviarEmail()" class="btn btn-secundario" id="btn-reenviar">
+        📧 Reenviar email
+      </button>
+    </div>
+
+    <div class="box-info">
+      <h3>📋 Detalhes do pedido</h3>
+      <p>
+        <strong>Pedido:</strong> <span class="pedido-num">${escapeHtml(pedido.numero)}</span><br>
+        <strong>Livro:</strong> Squishbook do(a) ${escapeHtml(pedido.nome_crianca)}<br>
+        ${pedido.cupom_codigo ? `<strong>Cupom:</strong> ${escapeHtml(pedido.cupom_codigo)}<br>` : ''}
+        <strong>Valor:</strong> R$ ${parseFloat(pedido.valor||0).toFixed(2).replace('.', ',')}
+      </p>
+    </div>
+
+    <div class="dica">
+      <strong>💡 Dica:</strong> salva o PDF em mais de um lugar (computador + nuvem). O link fica disponível por 30 dias pra você baixar quantas vezes quiser.
+    </div>
+
+    <a href="criar.html" class="voltar">✨ Criar outro Squishbook</a>
+  `;
+}
+
+async function reenviarEmail(){
+  const btn = document.getElementById('btn-reenviar');
+  if(!btn) return;
+  btn.disabled = true;
+  btn.textContent = '⏳ Enviando...';
+  try{
+    const senha = prompt('Confirme com a senha de admin:');
+    if(!senha){ btn.disabled = false; btn.textContent = '📧 Reenviar email'; return; }
+
+    const r = await fetch(`${BACKEND}/api/admin/pedidos/${encodeURIComponent(PEDIDO_ID)}/reenviar-email`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json', 'x-admin-key': senha}
+    });
+    if(!r.ok){
+      const err = await r.json().catch(()=>({}));
+      throw new Error(err.erro || 'Erro ao reenviar');
+    }
+    btn.textContent = '✅ Reenviado!';
+    setTimeout(()=>{ btn.textContent = '📧 Reenviar email'; btn.disabled = false; }, 3000);
+  }catch(e){
+    alert('Não conseguimos reenviar agora: ' + e.message + '\n\nTente entrar em contato pelo WhatsApp.');
+    btn.textContent = '📧 Reenviar email';
+    btn.disabled = false;
   }
 }
 
-function enviarEmail(){
-  var email = prompt('Digite o email para onde quer que enviemos o livro:');
-  if(!email) return;
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
-    alert('Email inválido. Tenta de novo?');
+async function reabrirCheckout(){
+  try{
+    const r = await fetch(`${BACKEND}/api/criar-checkout-pro`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({numero: PEDIDO_ID})
+    });
+    if(!r.ok) throw new Error('Erro ao gerar link');
+    const data = await r.json();
+    if(data.ja_pago && data.redirect_url){
+      window.location.href = data.redirect_url;
+      return;
+    }
+    if(data.init_point){
+      window.location.href = data.init_point;
+    }
+  }catch(e){
+    alert('Não conseguimos reabrir o pagamento. Entre em contato pelo WhatsApp.');
+  }
+}
+
+async function iniciar(){
+  if(!PEDIDO_ID){
+    renderSemId();
     return;
   }
-  // Envia por WhatsApp com instruções (versão simplificada de lançamento)
-  // Na próxima sessão, integrar com SMTP/SendGrid/Resend pra envio automático.
-  var pdfNome = localStorage.getItem('squishbook_ultimo_nome') || 'Seu Squishbook';
-  var msg = encodeURIComponent('Olá! Acabei de comprar o Squishbook. Por favor envie meu livro "' + pdfNome + '" para o email: ' + email);
-  window.open('https://wa.me/5511999999999?text=' + msg, '_blank');
-  alert('Pronto! Já recebemos sua solicitação. O livro será enviado para ' + email + ' em até 30 minutos.');
+
+  try{
+    const pedido = await buscarPedido(PEDIDO_ID);
+
+    if(pedido.status === 'Pago'){
+      stopPolling();
+      renderPago(pedido);
+      return;
+    }
+
+    if(pedido.status === 'Recusado'){
+      stopPolling();
+      renderPagamentoRecusado(pedido);
+      return;
+    }
+
+    // Status "Aguardando pagamento" — começa polling
+    renderAguardando(pedido);
+    startPolling();
+
+  } catch(e){
+    renderErro(e.message);
+  }
 }
+
+function startPolling(){
+  if(pollingTimer) return;
+  pollingTimer = setInterval(async () => {
+    tentativas++;
+    if(tentativas > MAX_TENTATIVAS){
+      stopPolling();
+      // Mostra mensagem de timeout mas mantém botão de retry
+      const dica = document.querySelector('.dica');
+      if(dica){
+        dica.innerHTML = '<strong>⏰ Está demorando mais que o normal.</strong><br>Atualiza a página ou entra em contato pelo WhatsApp se já pagou. Se ainda não pagou, <a href="#" onclick="reabrirCheckout();return false;" style="color:var(--roxo)">clica aqui pra reabrir o pagamento</a>.';
+      }
+      return;
+    }
+    try{
+      const pedido = await buscarPedido(PEDIDO_ID);
+      if(pedido.status === 'Pago'){
+        stopPolling();
+        renderPago(pedido);
+      } else if(pedido.status === 'Recusado'){
+        stopPolling();
+        renderPagamentoRecusado(pedido);
+      }
+    }catch(e){
+      // Silencia erro de polling, continua tentando
+      console.warn('polling erro:', e.message);
+    }
+  }, 3000);
+}
+
+function stopPolling(){
+  if(pollingTimer){
+    clearInterval(pollingTimer);
+    pollingTimer = null;
+  }
+}
+
+iniciar();
 </script>
 
 </body>
