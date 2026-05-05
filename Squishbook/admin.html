@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Admin — Squishbook</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Baloo+2:wght@700;800&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --azul:#0C447C;--azul2:#185FA5;--roxo:#7F77DD;--rosa:#D4537E;
+  --verde:#22C78B;--amarelo:#F5A623;--cinza:#F4F6FA;--borda:#E2E8F0;
+  --txt:#180F2E;--txt2:#5A6478;--white:#fff;
+}
+body{font-family:'Nunito',sans-serif;background:var(--cinza);color:var(--txt);min-height:100vh}
+
+/* LOGIN */
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0C447C,#7F77DD)}
+.login-box{background:white;border-radius:24px;padding:48px 40px;width:100%;max-width:380px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.login-logo{font-family:'Baloo 2',cursive;font-size:2rem;font-weight:900;color:var(--azul);margin-bottom:6px}
+.login-logo span{color:var(--rosa)}
+.login-sub{color:var(--txt2);font-size:.88rem;margin-bottom:28px}
+.login-box input{width:100%;border:2px solid var(--borda);border-radius:12px;padding:13px 16px;font-size:1rem;font-family:'Nunito',sans-serif;outline:none;transition:.2s}
+.login-box input:focus{border-color:var(--azul2)}
+.login-btn{width:100%;background:linear-gradient(135deg,var(--azul),var(--roxo));color:white;border:none;border-radius:12px;padding:14px;font-family:'Baloo 2',cursive;font-size:1rem;font-weight:800;cursor:pointer;margin-top:14px}
+.login-err{color:var(--rosa);font-size:.82rem;margin-top:10px;display:none}
+
+/* LAYOUT */
+.app{display:none}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:220px;background:linear-gradient(180deg,#0C447C,#185FA5);padding:24px 0;z-index:100}
+.sidebar-logo{font-family:'Baloo 2',cursive;font-size:1.3rem;font-weight:900;color:white;padding:0 20px 24px;border-bottom:1px solid rgba(255,255,255,.15)}
+.sidebar-logo span{color:rgba(255,255,255,.5)}
+.nav-item{display:flex;align-items:center;gap:10px;padding:12px 20px;color:rgba(255,255,255,.75);font-weight:700;font-size:.88rem;cursor:pointer;transition:.15s;border-left:3px solid transparent}
+.nav-item:hover,.nav-item.active{background:rgba(255,255,255,.12);color:white;border-left-color:white}
+.nav-item .ico{font-size:1.1rem;width:22px;text-align:center}
+.nav-section{font-size:.68rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.4);padding:16px 20px 6px}
+.main{margin-left:220px;min-height:100vh}
+.topbar{background:white;border-bottom:1px solid var(--borda);padding:16px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.page-title{font-family:'Baloo 2',cursive;font-size:1.2rem;font-weight:800;color:var(--azul)}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.btn-logout{background:none;border:1.5px solid var(--borda);border-radius:10px;padding:7px 14px;font-size:.82rem;font-weight:700;color:var(--txt2);cursor:pointer}
+.btn-refresh{background:linear-gradient(135deg,var(--azul),var(--roxo));border:none;border-radius:10px;padding:8px 16px;font-size:.82rem;font-weight:800;color:white;cursor:pointer;font-family:'Baloo 2',cursive}
+.content{padding:28px}
+
+/* CARDS DE MÉTRICAS */
+.metrics{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:28px}
+.metric{background:white;border-radius:16px;padding:20px;border:1px solid var(--borda)}
+.metric-label{font-size:.75rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--txt2);margin-bottom:8px}
+.metric-value{font-family:'Baloo 2',cursive;font-size:2rem;font-weight:900;color:var(--azul)}
+.metric-sub{font-size:.78rem;color:var(--txt2);margin-top:4px}
+.metric.verde .metric-value{color:var(--verde)}
+.metric.rosa .metric-value{color:var(--rosa)}
+.metric.amarelo .metric-value{color:var(--amarelo)}
+
+/* TABELA DE PEDIDOS */
+.card{background:white;border-radius:16px;border:1px solid var(--borda);overflow:hidden}
+.card-header{padding:18px 24px;border-bottom:1px solid var(--borda);display:flex;align-items:center;justify-content:space-between}
+.card-title{font-family:'Baloo 2',cursive;font-size:1rem;font-weight:800;color:var(--azul)}
+.filtros{display:flex;gap:8px;flex-wrap:wrap;padding:14px 24px;border-bottom:1px solid var(--borda);background:var(--cinza)}
+.filtro-btn{padding:6px 14px;border-radius:20px;border:1.5px solid var(--borda);background:white;font-size:.78rem;font-weight:700;cursor:pointer;transition:.15s}
+.filtro-btn.active{background:var(--azul);border-color:var(--azul);color:white}
+.search-input{padding:7px 14px;border:1.5px solid var(--borda);border-radius:20px;font-size:.82rem;font-family:'Nunito',sans-serif;outline:none;min-width:200px}
+.search-input:focus{border-color:var(--azul2)}
+table{width:100%;border-collapse:collapse}
+th{padding:11px 16px;text-align:left;font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--txt2);background:var(--cinza);border-bottom:1px solid var(--borda)}
+td{padding:14px 16px;border-bottom:1px solid var(--borda);font-size:.88rem}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#F8FAFF}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:.72rem;font-weight:800}
+.badge-novo{background:#EDE9FE;color:#6B46C1}
+.badge-pago{background:#D1FAE5;color:#065F46}
+.badge-gerando{background:#FEF3C7;color:#92400E}
+.badge-entregue{background:#DBEAFE;color:#1E40AF}
+.badge-impresso{background:#FCE7F3;color:#9D174D}
+.badge-digital{background:#E0F2FE;color:#0C4A6E}
+.badge-erro{background:#FEE2E2;color:#991B1B}
+.btn-acao{padding:5px 12px;border-radius:8px;border:none;font-size:.75rem;font-weight:700;cursor:pointer;margin-right:4px}
+.btn-ver{background:#EDE9FE;color:#6B46C1}
+.btn-wa{background:#D1FAE5;color:#065F46}
+.btn-ok{background:#DBEAFE;color:#1E40AF}
+.empty-state{text-align:center;padding:60px 20px;color:var(--txt2)}
+.empty-ico{font-size:3rem;margin-bottom:12px}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;display:none;align-items:center;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal{background:white;border-radius:20px;padding:32px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;position:relative}
+.modal-close{position:absolute;top:16px;right:16px;background:var(--cinza);border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:.8rem;font-weight:700}
+.modal h2{font-family:'Baloo 2',cursive;font-size:1.3rem;color:var(--azul);margin-bottom:20px}
+.detalhe-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--borda);font-size:.88rem}
+.detalhe-row:last-child{border-bottom:none}
+.detalhe-label{color:var(--txt2);font-weight:700}
+.detalhe-val{color:var(--txt);font-weight:600;text-align:right;max-width:60%}
+.status-select{border:1.5px solid var(--borda);border-radius:10px;padding:8px 12px;font-family:'Nunito',sans-serif;font-size:.88rem;outline:none;width:100%;margin-top:16px}
+.btn-salvar{background:linear-gradient(135deg,var(--azul),var(--roxo));color:white;border:none;border-radius:12px;padding:12px 24px;font-family:'Baloo 2',cursive;font-weight:800;font-size:.9rem;cursor:pointer;margin-top:12px;width:100%}
+
+/* SALDO */
+.saldo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
+.saldo-card{background:white;border-radius:16px;padding:20px;border:1px solid var(--borda)}
+.saldo-nome{font-weight:800;color:var(--txt2);font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+.saldo-valor{font-family:'Baloo 2',cursive;font-size:1.6rem;font-weight:900;color:var(--azul)}
+.saldo-status{font-size:.75rem;margin-top:4px}
+.saldo-ok{color:var(--verde)}
+.saldo-warn{color:var(--amarelo)}
+.saldo-link{display:block;margin-top:10px;font-size:.75rem;color:var(--azul2);text-decoration:none;font-weight:700}
+
+/* CLIENTES */
+.clientes-table td:nth-child(3){max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* LOADING */
+.loading{text-align:center;padding:40px;color:var(--txt2);font-size:.9rem}
+.spinner{width:32px;height:32px;border:3px solid var(--borda);border-top-color:var(--azul);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-wrap" id="loginWrap">
+  <div class="login-box">
+    <div class="login-logo">Squish<span>book</span></div>
+    <div class="login-sub">Painel administrativo</div>
+    <input type="password" id="senhaInput" placeholder="Senha" onkeydown="if(event.key==='Enter')login()"/>
+    <button class="login-btn" onclick="login()">Entrar</button>
+    <div class="login-err" id="loginErr">Senha incorreta.</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app" id="app">
+  <nav class="sidebar">
+    <div class="sidebar-logo">Squish<span>book</span></div>
+    <div class="nav-section">Principal</div>
+    <div class="nav-item active" onclick="mostrarPagina('pedidos',this)"><span class="ico">📦</span> Pedidos</div>
+    <div class="nav-item" onclick="mostrarPagina('clientes',this)"><span class="ico">👥</span> Clientes</div>
+    <div class="nav-section">Sistema</div>
+    <div class="nav-item" onclick="mostrarPagina('saldo',this)"><span class="ico">💳</span> Créditos</div>
+    <div class="nav-item" onclick="mostrarPagina('links',this)"><span class="ico">🔗</span> Links Rápidos</div>
+  </nav>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="page-title" id="pageTitle">Pedidos</div>
+      <div class="topbar-right">
+        <button class="btn-refresh" onclick="carregarDados()">⟳ Atualizar</button>
+        <button class="btn-logout" onclick="logout()">Sair</button>
+      </div>
+    </div>
+    <div class="content" id="content">
+      <div class="loading"><div class="spinner"></div>Carregando...</div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DETALHE -->
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)fecharModal()">
+  <div class="modal">
+    <button class="modal-close" onclick="fecharModal()">✕ Fechar</button>
+    <div id="modalContent"></div>
+  </div>
+</div>
+
+<script>
+var SENHA = '1Mar9966celo';
+var API = 'https://squishbook-backend-v2.onrender.com';
+var PAGINA_ATUAL = 'pedidos';
+var DADOS = { pedidos: [], clientes: [] };
+var FILTRO_STATUS = 'todos';
+var BUSCA = '';
+
+// ── AUTH ──
+function login(){
+  var s = document.getElementById('senhaInput').value;
+  if(s === SENHA){
+    document.getElementById('loginWrap').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    carregarDados();
+  } else {
+    document.getElementById('loginErr').style.display = 'block';
+  }
+}
+function logout(){
+  document.getElementById('loginWrap').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('senhaInput').value = '';
+}
+
+// ── NAVEGAÇÃO ──
+function mostrarPagina(pagina, el){
+  PAGINA_ATUAL = pagina;
+  document.querySelectorAll('.nav-item').forEach(function(n){ n.classList.remove('active'); });
+  if(el) el.classList.add('active');
+  var titulos = {pedidos:'Pedidos',clientes:'Clientes',saldo:'Créditos do Sistema',links:'Links Rápidos'};
+  document.getElementById('pageTitle').textContent = titulos[pagina] || pagina;
+  renderPagina();
+}
+
+function renderPagina(){
+  if(PAGINA_ATUAL === 'pedidos') renderPedidos();
+  else if(PAGINA_ATUAL === 'clientes') renderClientes();
+  else if(PAGINA_ATUAL === 'saldo') renderSaldo();
+  else if(PAGINA_ATUAL === 'links') renderLinks();
+}
+
+// ── CARREGAR DADOS ──
+async function carregarDados(){
+  document.getElementById('content').innerHTML = '<div class="loading"><div class="spinner"></div>Carregando dados...</div>';
+  try{
+    var [rPed, rCli] = await Promise.all([
+      fetch(API + '/api/pedidos').catch(function(){ return {ok:false}; }),
+      fetch(API + '/api/clientes').catch(function(){ return {ok:false}; })
+    ]);
+    DADOS.pedidos = rPed.ok ? await rPed.json() : [];
+    DADOS.clientes = rCli.ok ? await rCli.json() : [];
+    if(!Array.isArray(DADOS.pedidos)) DADOS.pedidos = [];
+    if(!Array.isArray(DADOS.clientes)) DADOS.clientes = [];
+  }catch(e){
+    DADOS.pedidos = [];
+    DADOS.clientes = [];
+  }
+  renderPagina();
+}
+
+// ── PEDIDOS ──
+function renderPedidos(){
+  var pedidos = DADOS.pedidos;
+  var total = pedidos.length;
+  var pagos = pedidos.filter(function(p){ return p.status === 'pago' || p.status === 'entregue'; }).length;
+  var receita = pedidos.reduce(function(s,p){ return s + (parseFloat(p.valor)||0); }, 0);
+  var impresso = pedidos.filter(function(p){ return p.formato === 'impresso'; }).length;
+
+  var filtrados = pedidos.filter(function(p){
+    var statusOk = FILTRO_STATUS === 'todos' || p.status === FILTRO_STATUS;
+    var buscaOk = !BUSCA || (p.email||'').toLowerCase().includes(BUSCA) || (p.nome_crianca||'').toLowerCase().includes(BUSCA) || (p.telefone||'').includes(BUSCA);
+    return statusOk && buscaOk;
+  });
+
+  var rows = filtrados.length === 0
+    ? '<tr><td colspan="7"><div class="empty-state"><div class="empty-ico">📭</div>Nenhum pedido encontrado</div></td></tr>'
+    : filtrados.map(function(p, i){
+        var data = p.criado_em ? new Date(p.criado_em).toLocaleDateString('pt-BR') : '--';
+        return '<tr>'
+          + '<td><strong>#' + (p.id || (i+1)) + '</strong><br><span style="font-size:.75rem;color:var(--txt2)">' + data + '</span></td>'
+          + '<td>' + (p.email || '--') + (p.telefone ? '<br><span style="font-size:.75rem;color:var(--txt2)">' + p.telefone + '</span>' : '') + '</td>'
+          + '<td>' + (p.nome_crianca || '--') + '</td>'
+          + '<td><span class="badge badge-' + (p.formato||'digital') + '">' + (p.formato === 'impresso' ? '📗 Impresso' : '📱 Digital') + '</span></td>'
+          + '<td><strong>R$ ' + (parseFloat(p.valor)||0).toFixed(2).replace('.',',') + '</strong></td>'
+          + '<td>' + badgeStatus(p.status) + '</td>'
+          + '<td>'
+          + '<button class="btn-acao btn-ver" onclick="verPedido(' + i + ')">Ver</button>'
+          + (p.telefone ? '<button class="btn-acao btn-wa" onclick="abrirWA(\'' + p.telefone + '\',\'' + (p.nome_crianca||'') + '\')">WA</button>' : '')
+          + '</td>'
+          + '</tr>';
+      }).join('');
+
+  document.getElementById('content').innerHTML =
+    '<div class="metrics">'
+    + metricCard('Total de Pedidos', total, '', '')
+    + metricCard('Pagos / Entregues', pagos, '', 'verde')
+    + metricCard('Receita Total', 'R$ ' + receita.toFixed(2).replace('.',','), '', 'amarelo')
+    + metricCard('Impressos', impresso, 'aguardando gráfica', 'rosa')
+    + '</div>'
+    + '<div class="card">'
+    + '<div class="card-header"><span class="card-title">📦 Lista de Pedidos</span><span style="font-size:.8rem;color:var(--txt2)">' + filtrados.length + ' de ' + total + '</span></div>'
+    + '<div class="filtros">'
+    + filtroBtn('todos','Todos') + filtroBtn('novo','Novos') + filtroBtn('pago','Pagos') + filtroBtn('gerando','Gerando') + filtroBtn('entregue','Entregues') + filtroBtn('impresso','Impressos')
+    + '<input class="search-input" placeholder="Buscar email, nome..." oninput="BUSCA=this.value.toLowerCase();renderPedidos()" value="' + BUSCA + '"/>'
+    + '</div>'
+    + '<div style="overflow-x:auto"><table><thead><tr><th>Pedido</th><th>Cliente</th><th>Criança</th><th>Formato</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead><tbody>'
+    + rows
+    + '</tbody></table></div></div>';
+}
+
+function badgeStatus(s){
+  var map = {novo:'badge-novo',pago:'badge-pago',gerando:'badge-gerando',entregue:'badge-entregue',erro:'badge-erro'};
+  var labels = {novo:'🆕 Novo',pago:'✅ Pago',gerando:'⚙️ Gerando',entregue:'📨 Entregue',erro:'⚠️ Erro'};
+  var cls = map[s] || 'badge-novo';
+  return '<span class="badge ' + cls + '">' + (labels[s] || s || 'Novo') + '</span>';
+}
+
+function filtroBtn(val, label){
+  var active = FILTRO_STATUS === val ? ' active' : '';
+  return '<button class="filtro-btn' + active + '" onclick="FILTRO_STATUS=\'' + val + '\';renderPedidos()">' + label + '</button>';
+}
+
+function metricCard(label, value, sub, mod){
+  return '<div class="metric ' + mod + '"><div class="metric-label">' + label + '</div><div class="metric-value">' + value + '</div>' + (sub ? '<div class="metric-sub">' + sub + '</div>' : '') + '</div>';
+}
+
+function verPedido(idx){
+  var filtrados = DADOS.pedidos.filter(function(p){
+    var statusOk = FILTRO_STATUS === 'todos' || p.status === FILTRO_STATUS;
+    var buscaOk = !BUSCA || (p.email||'').toLowerCase().includes(BUSCA) || (p.nome_crianca||'').toLowerCase().includes(BUSCA);
+    return statusOk && buscaOk;
+  });
+  var p = filtrados[idx];
+  if(!p) return;
+  var end = p.endereco ? (p.endereco.logradouro + ', ' + p.endereco.numero + (p.endereco.complemento?' '+p.endereco.complemento:'') + ' — ' + p.endereco.bairro + ', ' + p.endereco.cidade + '/' + p.endereco.estado + ' — CEP ' + p.endereco.cep) : 'Não informado';
+  document.getElementById('modalContent').innerHTML =
+    '<h2>📦 Pedido #' + (p.id||idx+1) + '</h2>'
+    + detalheRow('Email', p.email||'--')
+    + detalheRow('WhatsApp', p.telefone||'Não informado')
+    + detalheRow('Criança', p.nome_crianca||'--')
+    + detalheRow('Formato', p.formato === 'impresso' ? '📗 Impresso R$159' : '📱 Digital R$79')
+    + detalheRow('Título do livro', p.titulo_livro||'--')
+    + detalheRow('Endereço', end)
+    + detalheRow('Valor', 'R$ ' + (parseFloat(p.valor)||0).toFixed(2).replace('.',','))
+    + detalheRow('Status', badgeStatus(p.status))
+    + detalheRow('Data', p.criado_em ? new Date(p.criado_em).toLocaleString('pt-BR') : '--')
+    + '<select class="status-select" id="selectStatus">'
+    + ['novo','pago','gerando','entregue','erro'].map(function(s){ return '<option value="'+s+'"'+(p.status===s?' selected':'')+'>'+s+'</option>'; }).join('')
+    + '</select>'
+    + '<button class="btn-salvar" onclick="salvarStatus(' + JSON.stringify(p.id) + ',idx)">💾 Salvar status</button>'
+    + (p.telefone ? '<button class="btn-salvar" style="background:linear-gradient(135deg,#25D366,#128C7E);margin-top:8px" onclick="abrirWA(\''+p.telefone+'\',\''+p.nome_crianca+'\')">💬 Abrir WhatsApp</button>' : '');
+  document.getElementById('modalOverlay').classList.add('show');
+}
+
+function detalheRow(label, val){
+  return '<div class="detalhe-row"><span class="detalhe-label">' + label + '</span><span class="detalhe-val">' + val + '</span></div>';
+}
+
+function fecharModal(){
+  document.getElementById('modalOverlay').classList.remove('show');
+}
+
+async function salvarStatus(id, idx){
+  var s = document.getElementById('selectStatus').value;
+  try{
+    await fetch(API + '/api/pedidos/' + id + '/status', {
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({status:s})
+    });
+    await carregarDados();
+    fecharModal();
+  }catch(e){
+    alert('Erro ao salvar. Tente novamente.');
+  }
+}
+
+function abrirWA(telefone, nome){
+  var num = telefone.replace(/\D/g,'');
+  if(!num.startsWith('55')) num = '55' + num;
+  var msg = encodeURIComponent('Oi! Aqui é o Marcelo, do Squishbook. Seu livro do(a) ' + (nome||'') + ' está pronto! 📖✨');
+  window.open('https://wa.me/' + num + '?text=' + msg, '_blank');
+}
+
+// ── CLIENTES ──
+function renderClientes(){
+  var clientes = DADOS.clientes;
+  var rows = clientes.length === 0
+    ? '<tr><td colspan="5"><div class="empty-state"><div class="empty-ico">👥</div>Nenhum cliente cadastrado ainda</div></td></tr>'
+    : clientes.map(function(c, i){
+        var data = c.criado_em ? new Date(c.criado_em).toLocaleDateString('pt-BR') : '--';
+        return '<tr>'
+          + '<td>' + (c.email||'--') + '</td>'
+          + '<td>' + (c.telefone ? '<a href="https://wa.me/55' + c.telefone.replace(/\D/g,'') + '" target="_blank" style="color:var(--verde);font-weight:700">' + c.telefone + '</a>' : '<span style="color:var(--txt2)">--</span>') + '</td>'
+          + '<td>' + (c.nome_crianca||'--') + '</td>'
+          + '<td><span class="badge badge-' + (c.formato||'digital') + '">' + (c.formato === 'impresso' ? '📗' : '📱') + ' ' + (c.formato||'digital') + '</span></td>'
+          + '<td>' + data + '</td>'
+          + '</tr>';
+      }).join('');
+
+  document.getElementById('content').innerHTML =
+    '<div class="metrics">'
+    + metricCard('Total Clientes', clientes.length, '', '')
+    + metricCard('Com WhatsApp', clientes.filter(function(c){ return c.telefone; }).length, 'para follow-up', 'verde')
+    + metricCard('Impressos', clientes.filter(function(c){ return c.formato === 'impresso'; }).length, 'aguardam gráfica', 'rosa')
+    + '</div>'
+    + '<div class="card">'
+    + '<div class="card-header"><span class="card-title">👥 Base de Clientes</span><span style="font-size:.8rem;color:var(--txt2)">' + clientes.length + ' clientes</span></div>'
+    + '<div style="overflow-x:auto"><table class="clientes-table"><thead><tr><th>Email</th><th>WhatsApp</th><th>Criança</th><th>Formato</th><th>Data</th></tr></thead><tbody>'
+    + rows
+    + '</tbody></table></div></div>';
+}
+
+// ── SALDO ──
+function renderSaldo(){
+  document.getElementById('content').innerHTML =
+    '<div class="saldo-grid">'
+    + saldoCard('fal.ai — Imagens', '$ 28,67', '✅ Recarga auto: $10 quando < $5', 'ok', 'https://dashboard.fal.ai/usage-billing/credits')
+    + saldoCard('Anthropic — IA', '$ 7,48', '✅ Recarga auto: $15 quando < $5', 'ok', 'https://console.anthropic.com/settings/billing')
+    + saldoCard('Render.com — Backend', 'Starter $7/mês', '✅ Sempre no ar — sem cold start', 'ok', 'https://dashboard.render.com')
+    + saldoCard('Netlify — Frontend', 'Free', '✅ squishbook.com.br no ar', 'ok', 'https://app.netlify.com')
+    + saldoCard('Mercado Pago — Digital', 'R$ 79', '✅ Link: mpago.la/1U9tCUv', 'ok', 'https://mpago.la/1U9tCUv')
+    + saldoCard('Mercado Pago — Impresso', 'R$ 159', '✅ Link: mpago.la/2NR4wsz', 'ok', 'https://mpago.la/2NR4wsz')
+    + '</div>'
+    + '<div style="margin-top:20px;padding:16px 20px;background:white;border-radius:14px;border:1px solid var(--borda);font-size:.85rem;color:var(--txt2)">'
+    + '<strong style="color:var(--azul)">📊 Custo estimado por livro:</strong> Digital ~$0,80 (fal.ai) + $0,08 (Anthropic) = ~$0,88/livro. Com câmbio R$5,80 = ~R$5,10/livro. Margem digital: R$73,90 (93%). Margem impresso: R$153,90 (97%) antes da gráfica.'
+    + '</div>';
+}
+
+function saldoCard(nome, valor, status, tipo, link){
+  return '<div class="saldo-card">'
+    + '<div class="saldo-nome">' + nome + '</div>'
+    + '<div class="saldo-valor">' + valor + '</div>'
+    + '<div class="saldo-status saldo-' + tipo + '">' + status + '</div>'
+    + '<a href="' + link + '" target="_blank" class="saldo-link">Acessar painel →</a>'
+    + '</div>';
+}
+
+// ── LINKS ──
+function renderLinks(){
+  var links = [
+    {ico:'🌐', label:'Site Squishbook', url:'https://squishbook.com.br', desc:'Página principal'},
+    {ico:'✨', label:'Criar livro', url:'https://squishbook.com.br/criar.html', desc:'Fluxo completo'},
+    {ico:'📱', label:'Instagram', url:'https://instagram.com/squishbook_oficial', desc:'@squishbook_oficial'},
+    {ico:'💳', label:'MP Digital R$79', url:'https://mpago.la/1U9tCUv', desc:'Link de pagamento'},
+    {ico:'📗', label:'MP Impresso R$159', url:'https://mpago.la/2NR4wsz', desc:'Link de pagamento'},
+    {ico:'🚀', label:'Backend Render', url:'https://dashboard.render.com', desc:'squishbook-backend-v2'},
+    {ico:'⚡', label:'Netlify Deploy', url:'https://app.netlify.com', desc:'Deploy do frontend'},
+    {ico:'🖼️', label:'fal.ai Billing', url:'https://dashboard.fal.ai/usage-billing/credits', desc:'Créditos de imagem'},
+    {ico:'🤖', label:'Anthropic Billing', url:'https://console.anthropic.com/settings/billing', desc:'Créditos Claude'},
+    {ico:'📊', label:'Notion Pedidos', url:'https://notion.so/cea7112507c64b58af707a6fa9de9577', desc:'Central de pedidos'},
+  ];
+  document.getElementById('content').innerHTML =
+    '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px">'
+    + links.map(function(l){
+        return '<a href="' + l.url + '" target="_blank" style="background:white;border:1px solid var(--borda);border-radius:14px;padding:18px;display:flex;gap:14px;align-items:center;text-decoration:none;transition:.15s" onmouseover="this.style.borderColor=\'var(--azul2)\'" onmouseout="this.style.borderColor=\'var(--borda)\'">'
+          + '<span style="font-size:1.6rem">' + l.ico + '</span>'
+          + '<div><div style="font-weight:800;color:var(--azul);font-size:.9rem">' + l.label + '</div><div style="font-size:.78rem;color:var(--txt2);margin-top:2px">' + l.desc + '</div></div>'
+          + '</a>';
+      }).join('')
+    + '</div>';
+}
+</script>
+</body>
+</html>
