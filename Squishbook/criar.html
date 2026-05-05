@@ -1586,8 +1586,8 @@ async function gerarAvatarDalle(p){
   var ehAdultoExp=(faixaExp==='adulto'||faixaExp==='idoso');
 
   var faixaDesc='';
-  if(faixaExp==='bebe') faixaDesc='BABY character, very young toddler, round baby face, chubby cheeks, ';
-  else if(faixaExp==='crianca') faixaDesc='CHILD character, young kid aged 4-8, child proportions, ';
+  if(faixaExp==='bebe') faixaDesc='kawaii chibi character with very small playful proportions, round soft chibi face, ';
+  else if(faixaExp==='crianca') faixaDesc='kawaii chibi character with small playful proportions, soft rounded chibi face, ';
   else if(faixaExp==='adolescente') faixaDesc='TEENAGER character, pre-teen to teen, taller than a child, youthful face, ';
   else if(faixaExp==='adulto') faixaDesc='ADULT character, mature adult face with adult proportions, clearly NOT a child, NOT a baby NOT an infant, adult chibi style, ';
   else if(faixaExp==='idoso') faixaDesc='ELDERLY character, senior adult with mature face, gentle wrinkles, adult proportions, clearly NOT a child, ';
@@ -1652,7 +1652,7 @@ async function gerarAvatarDalle(p){
     prompt = 'Transform the person from @image1 into a chibi kawaii watercolor character for a children\'s book. '
       + 'Full body portrait, centered in frame, from head to feet visible. '
       + descFisica
-      + 'Preserve face, hair, skin tone and distinctive features exactly from the reference photo. '
+      + 'Inspired by the reference photo @image1 in chibi watercolor style, keeping hair color, skin tone and distinctive features visually consistent. '
       + 'Expression: ' + expressao + '. '
       + 'Soft pastel watercolor children\'s book illustration, chibi proportions with big glossy eyes and rosy cheeks. '
       + cor + ' clothing and accent colors. '
@@ -2377,8 +2377,8 @@ async function gerarCenas(){
         // Determina gênero/idade pra ancorar prompt
         var gf = detectaGeneroFaixa(p);
         var tipoPessoa;
-        if(gf.faixa==='baby/toddler') tipoPessoa = gf.genero==='female' ? 'a small toddler girl' : 'a small toddler boy';
-        else if(gf.faixa==='child') tipoPessoa = gf.genero==='female' ? 'a young girl about 6 years old' : 'a young boy about 6 years old';
+        if(gf.faixa==='baby/toddler') tipoPessoa = gf.genero==='female' ? 'a kawaii chibi character with very small playful proportions and a round soft face' : 'a kawaii chibi character with very small playful proportions and a round soft face';
+        else if(gf.faixa==='child') tipoPessoa = gf.genero==='female' ? 'a kawaii chibi character with small playful proportions and a soft rounded face' : 'a kawaii chibi character with small playful proportions and a soft rounded face';
         else if(gf.faixa==='teenager') tipoPessoa = gf.genero==='female' ? 'a teenage girl' : 'a teenage boy';
         else tipoPessoa = gf.genero==='female' ? 'a grown adult woman aged 30 to 40, with mature adult facial features (defined cheekbones, slim adult jawline, NOT a round childlike face), tall slim adult body proportions, NOT a teenager, NOT a schoolgirl' : 'a grown adult man aged 30 to 40, with mature adult facial features and tall adult body proportions';
 
@@ -2399,7 +2399,7 @@ async function gerarCenas(){
         // escolher um castanho "default chibi". Solução: ordem direta de OBSERVAR
         // a foto e reproduzir a cor exata, qualquer que seja ela.
         var promptChibi = 'Transform the person from @image1 into a chibi kawaii watercolor character. '
-          + 'The character is ' + tipoPessoa + ', preserve face features and identity exactly from the photo. '
+          + 'The character is ' + tipoPessoa + ', inspired by the reference photo @image1 in chibi watercolor style with a soft rounded face. '
           + 'EYE COLOR INSTRUCTION (CRITICAL): carefully examine the actual iris color of the person\'s eyes in the reference photo @image1, then reproduce EXACTLY that same iris color in the chibi character\'s eyes. The chibi eyes are stylized large and glossy, BUT the iris color must match the photo precisely whether the photo shows blue, gray, green, hazel, brown, or any other natural eye color. Do not invent a different eye color. Do not pick a default. Match the photo. '
           + 'Standing in a neutral straight pose, facing the viewer, arms relaxed at sides, gentle natural smile. '
           + 'Full body visible from head to feet, centered in the image. '
@@ -2633,9 +2633,9 @@ function descreverPersonagemParaPrompt(p, expressao, isPrincipal){
   var adultoDesc='';
   var ehAdulto=(faixa==='adulto'||faixa==='idoso');
   if(faixa==='bebe'){
-    adultoDesc='BABY character, very young toddler, round baby face, small body, chubby cheeks, tiny hands, ';
+    adultoDesc='kawaii chibi character with very small playful proportions, round soft chibi face, tiny chibi hands, ';
   } else if(faixa==='crianca'){
-    adultoDesc='CHILD character, young kid aged 4-8, child proportions, ';
+    adultoDesc='kawaii chibi character with small playful proportions, soft rounded chibi face, ';
   } else if(faixa==='adolescente'){
     adultoDesc='TEENAGER character, pre-teen to teen, taller than a child, youthful face, ';
   } else if(faixa==='adulto'){
@@ -2951,8 +2951,8 @@ function filtrarCenarioV4(cenario, qtdPersonagens){
 function descricaoPersonagemV4(p){
   var gf = detectaGeneroFaixa(p);
   var base = '';
-  if(gf.faixa==='baby/toddler') base = gf.genero==='female' ? 'a baby girl' : 'a baby boy';
-  else if(gf.faixa==='child') base = gf.genero==='female' ? 'a young girl about 6 years old, small chibi child proportions' : 'a young boy about 6 years old, small chibi child proportions';
+  if(gf.faixa==='baby/toddler') base = gf.genero==='female' ? 'a kawaii chibi character with very small playful proportions and a round soft face' : 'a kawaii chibi character with very small playful proportions and a round soft face';
+  else if(gf.faixa==='child') base = gf.genero==='female' ? 'a kawaii chibi character with small playful proportions and a soft rounded face' : 'a kawaii chibi character with small playful proportions and a soft rounded face';
   else if(gf.faixa==='teenager') base = gf.genero==='female' ? 'a teenage girl' : 'a teenage boy';
   // Sessão 6 patch (28/04 23:50): adulto com proporção explícita e idade quantificada.
   else if(gf.faixa==='adult') base = gf.genero==='female' ? 'a grown adult woman aged 30 to 40 with mature adult facial features (defined cheekbones, slim adult jawline) and tall adult body proportions (longer legs and torso than a child), clearly NOT a teenager, NOT a schoolgirl, NOT a child' : 'a grown adult man aged 30 to 40 with mature adult facial features and tall adult body proportions, NOT a teenager';
@@ -2967,7 +2967,7 @@ function descricaoPersonagemV4(p){
     else if(gf.faixa==='elderly' && gf.genero==='female') papel=' (a grandmother)';
     else if(gf.faixa==='elderly' && gf.genero==='male') papel=' (a grandfather)';
   }
-  return base + papel + ', preserve face and features exactly including the natural iris eye color shown in the reference photo (match the photo eye color whether blue, gray, green, hazel or brown, do not invent a different color)';
+  return base + papel + ', inspired by the reference photo in chibi watercolor style, including the natural iris eye color shown in the reference photo (match the photo eye color whether blue, gray, green, hazel or brown, do not invent a different color)';
 }
 
 // Detecta se a cena precisa de reforço de escala (adulto + criança juntos).
@@ -3884,17 +3884,17 @@ async function gerarPDFReal(){
         // Descri\u00e7\u00e3o do protagonista com g\u00eanero/idade ancorados (mesmo padr\u00e3o do miolo)
         var gfCapa = detectaGeneroFaixa(protCapa);
         var tipoCapa = '';
-        if(gfCapa.faixa==='baby/toddler') tipoCapa = gfCapa.genero==='female' ? 'a baby girl' : 'a baby boy';
-        else if(gfCapa.faixa==='child') tipoCapa = gfCapa.genero==='female' ? 'a young girl' : 'a young boy';
+        if(gfCapa.faixa==='baby/toddler') tipoCapa = gfCapa.genero==='female' ? 'a kawaii chibi character with very small playful proportions and a round soft face' : 'a kawaii chibi character with very small playful proportions and a round soft face';
+        else if(gfCapa.faixa==='child') tipoCapa = gfCapa.genero==='female' ? 'a kawaii chibi character with small playful proportions and a soft rounded face' : 'a kawaii chibi character with small playful proportions and a soft rounded face';
         else if(gfCapa.faixa==='teenager') tipoCapa = gfCapa.genero==='female' ? 'a teenage girl' : 'a teenage boy';
-        else tipoCapa = gfCapa.genero==='female' ? 'a young girl' : 'a young boy';
+        else tipoCapa = gfCapa.genero==='female' ? 'a kawaii chibi character with small playful proportions' : 'a kawaii chibi character with small playful proportions';
 
         // Prompt de capa: composi\u00e7\u00e3o retrato, personagem centralizado, fundo tem\u00e1tico
         // Prompt de capa: composição retrato, personagem centralizado, fundo temático
         // Sessão 6 patch v3 (29/04 23:30): instrução neutra pra cor real dos olhos
         // (capa estava saindo com olho castanho default contra foto de olho claro).
         var promptCapaV4 = 'Transform the person from @image1 into a chibi kawaii watercolor character for a children\'s book cover. '
-          + 'The character is ' + tipoCapa + ', preserve face and features exactly. '
+          + 'The character is ' + tipoCapa + ', inspired by the reference photo @image1 in chibi watercolor style. '
           + 'EYE COLOR (CRITICAL): examine the actual iris color in the reference photo @image1 and reproduce EXACTLY that same iris color in the chibi. Match the photo whether eyes are blue, gray, green, hazel, or brown. Do not pick a default. Do not invent a color. '
           + 'Portrait composition: character centered in the image, facing the viewer, '
           + 'with a big joyful smile and arms open wide in a welcoming pose. '
