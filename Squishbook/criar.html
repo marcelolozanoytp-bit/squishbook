@@ -904,7 +904,20 @@ function remP(id){
 }
 function av1(){
   if(!ST.personagens[0].nome.trim()||!ST.idadeCrianca.trim()){
-    document.getElementById('erroP').classList.add('show'); return;
+    document.getElementById('erroP').classList.add('show');
+    document.getElementById('erroP').textContent='Informe o nome da crianca e a idade para continuar.';
+    return;
+  }
+  // Defesa: personagens secundarios com foto mas sem nome viram "fantasmas"
+  // (chibi gera mas a cena descarta por falta de nome). Bloqueia aqui.
+  for(var i=1;i<ST.personagens.length;i++){
+    var p=ST.personagens[i];
+    if(p.fotoUrl && !(p.nome||'').trim()){
+      var e=document.getElementById('erroP');
+      e.classList.add('show');
+      e.textContent='O personagem '+(i+1)+' (com foto) precisa de um nome. Use o nome real (ex: "Mariana") ou o papel (ex: "Mamae", "Vovo").';
+      return;
+    }
   }
   ST.step=2; render();
 }
@@ -3105,7 +3118,29 @@ async function gerarCenaPagina(pg,idx){
   for(var i=0;i<ST.personagens.length;i++){
     var p=ST.personagens[i];
     if(p.papel==='protagonista'){ parsNaPg.push(p); continue; }
-    if(!p.nome) continue;
+
+    // Defesa: se personagem tem foto/chibi (investimento visual feito) mas
+    // ficou sem nome, NAO descarta — investe esforco pra incluir mesmo assim.
+    var temVisual = !!(p.fotoUrl || p.chibiAvatarUrl);
+    var temNome = !!(p.nome && p.nome.trim());
+
+    if(!temNome && !temVisual) continue;        // sem nome E sem visual = ignora
+    if(!temNome && temVisual){
+      // Tem visual mas sem nome: incluir se papel sugere presenca recorrente
+      // (familiar, amigo) OU se o texto da pagina menciona algum alias do papel
+      if(p.papel==='familiar'||p.papel==='amigo'){ parsNaPg.push(p); continue; }
+      // Para outros papeis (avo, tio, etc), tenta aliasMap pelo papel literal
+      var papelKey=(p.papel||'').toLowerCase();
+      var aliasesPapel=aliasMap[papelKey]||[papelKey];
+      var matchPapel=false;
+      for(var ap2=0;ap2<aliasesPapel.length;ap2++){
+        if(textoCombinadoBusca.indexOf(aliasesPapel[ap2])>=0){ matchPapel=true; break; }
+      }
+      if(matchPapel) parsNaPg.push(p);
+      continue;
+    }
+
+    // Caminho normal (tem nome)
     if(p.papel==='familiar'||p.papel==='amigo'){ parsNaPg.push(p); continue; }
 
     var nomeLower=p.nome.toLowerCase();
