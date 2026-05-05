@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -2067,6 +2068,8 @@ async function finalizar(){
 
     // Gera link MP din\u00e2mico via backend (substitui link est\u00e1tico antigo)
     var nomeCrianca = (ST.personagens && ST.personagens[0]) ? ST.personagens[0].nome : 'Squishbook';
+    var externalRef = 'PRE-' + Date.now() + '-' + Math.random().toString(36).substring(2,8).toUpperCase();
+    ST.external_reference = externalRef;
     var resp = await fetch('https://squishbook-backend-v2.onrender.com/api/pagamento', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
@@ -2084,7 +2087,7 @@ async function finalizar(){
           pending: 'https://squishbook.com.br/criar.html?status=pendente',
           failure: 'https://squishbook.com.br/criar.html?status=erro'
         },
-        external_reference: 'PRE-' + Date.now() + '-' + Math.random().toString(36).substring(2,8).toUpperCase()
+        external_reference: externalRef
       })
     });
     if(!resp.ok) throw new Error('Erro ao gerar link de pagamento (HTTP ' + resp.status + ')');
@@ -2127,21 +2130,97 @@ async function finalizar(){
 
 // ═══ TELA POS-PAGAMENTO (step 8) ════════════════════════════
 async function salvarClienteEGerar(){
-  // Captura lead (email + nome) no backend antes de gerar o livro.
-  // O cadastro completo (whatsapp, valor, pedido) acontece em /api/finalizar-pedido
-  // depois que o PDF é gerado, via enviarLivro().
+  // Cupom 100% off: pula validação de pagamento (já era pulado no MP)
+  if((ST.cupom_desconto||0) === 100){
+    try{
+      await fetch('https://squishbook-backend-v2.onrender.com/api/leads',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          email: ST.email,
+          nome: ST.personagens[0]?ST.personagens[0].nome:'',
+          origem: ST.cupom_aplicado?('cupom_'+ST.cupom_aplicado):'criar_livro'
+        })
+      });
+    }catch(e){ /* não bloqueia o fluxo se falhar */ }
+    ST.step=8; render();
+    return;
+  }
+
+  // VALIDAÇÃO DE PAGAMENTO: confirma com MP antes de gerar livro
+  var btnEl = document.querySelector('.btn.btn-sucesso');
+  var textoOriginal = btnEl ? btnEl.innerHTML : '';
+  if(btnEl){
+    btnEl.disabled = true;
+    btnEl.innerHTML = '⏳ Verificando pagamento...';
+    btnEl.style.opacity = '0.7';
+  }
+
   try{
-    await fetch('https://squishbook-backend-v2.onrender.com/api/leads',{
+    var verifResp = await fetch('https://squishbook-backend-v2.onrender.com/api/verificar-pagamento',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
-        email: ST.email,
-        nome: ST.personagens[0]?ST.personagens[0].nome:'',
-        origem: ST.cupom_aplicado?('cupom_'+ST.cupom_aplicado):'criar_livro'
+        preference_id: ST.mp_preference_id || null,
+        external_reference: ST.external_reference || null
       })
     });
-  }catch(e){ /* não bloqueia o fluxo se falhar */ }
-  ST.step=8; render();
+    var verifData = await verifResp.json();
+
+    if(!verifData.aprovado){
+      // Pagamento não confirmado: mostra mensagem e libera botão pra tentar de novo
+      if(btnEl){
+        btnEl.disabled = false;
+        btnEl.innerHTML = textoOriginal;
+        btnEl.style.opacity = '1';
+      }
+      var msg = verifData.mensagem || 'Ainda não recebemos a confirmação do seu pagamento.';
+      var avisoEl = document.getElementById('avisoPagamento');
+      if(!avisoEl){
+        avisoEl = document.createElement('div');
+        avisoEl.id = 'avisoPagamento';
+        avisoEl.style.cssText = 'background:#FEF3C7;border:2px solid #F59E0B;border-radius:12px;padding:14px 16px;margin-top:14px;color:#92400E;font-size:.9rem;line-height:1.5';
+        var btnRow = btnEl ? btnEl.parentElement : null;
+        if(btnRow && btnRow.parentElement) btnRow.parentElement.insertBefore(avisoEl, btnRow);
+      }
+      avisoEl.innerHTML = '⚠️ <strong>Pagamento ainda não confirmado.</strong><br>' + msg + '<br><span style="font-size:.82rem;color:#78350F">Se você acabou de pagar, aguarde 30 segundos e clique novamente. Pagamentos por PIX e boleto podem levar alguns minutos.</span>';
+      return;
+    }
+
+    // Pagamento aprovado: salva payment_id e segue
+    ST.mp_payment_id = verifData.payment_id;
+
+    // Captura lead (não bloqueia)
+    try{
+      await fetch('https://squishbook-backend-v2.onrender.com/api/leads',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          email: ST.email,
+          nome: ST.personagens[0]?ST.personagens[0].nome:'',
+          origem: ST.cupom_aplicado?('cupom_'+ST.cupom_aplicado):'criar_livro'
+        })
+      });
+    }catch(e){ /* não bloqueia */ }
+
+    ST.step=8; render();
+  }catch(e){
+    console.error('Erro verificar pagamento:', e);
+    if(btnEl){
+      btnEl.disabled = false;
+      btnEl.innerHTML = textoOriginal;
+      btnEl.style.opacity = '1';
+    }
+    var avisoEl2 = document.getElementById('avisoPagamento');
+    if(!avisoEl2){
+      avisoEl2 = document.createElement('div');
+      avisoEl2.id = 'avisoPagamento';
+      avisoEl2.style.cssText = 'background:#FEE2E2;border:2px solid #EF4444;border-radius:12px;padding:14px 16px;margin-top:14px;color:#991B1B;font-size:.9rem';
+      var btnRow2 = btnEl ? btnEl.parentElement : null;
+      if(btnRow2 && btnRow2.parentElement) btnRow2.parentElement.insertBefore(avisoEl2, btnRow2);
+    }
+    avisoEl2.innerHTML = '⚠️ Erro ao verificar pagamento. Tente novamente em instantes.';
+  }
 }
 function sfim(c){
   var urlParams=new URLSearchParams(window.location.search);
