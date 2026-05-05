@@ -2114,21 +2114,17 @@ async function finalizar(){
 
 // ═══ TELA POS-PAGAMENTO (step 8) ════════════════════════════
 async function salvarClienteEGerar(){
-  // Salva cliente no backend (email + telefone) antes de gerar o livro
+  // Captura lead (email + nome) no backend antes de gerar o livro.
+  // O cadastro completo (whatsapp, valor, pedido) acontece em /api/finalizar-pedido
+  // depois que o PDF é gerado, via enviarLivro().
   try{
-    var fmtObj=FORMATOS.filter(function(f){return f.id===ST.formato;})[0];
-    var total=(fmtObj?fmtObj.p:0)+ST.extras*PRECO_EXTRA;
-    await fetch('https://squishbook-backend-v2.onrender.com/api/clientes',{
+    await fetch('https://squishbook-backend-v2.onrender.com/api/leads',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         email: ST.email,
-        telefone: ST.telefone||'',
-        nome_crianca: ST.personagens[0]?ST.personagens[0].nome:'',
-        formato: ST.formato||'digital',
-        valor: total,
-        titulo_livro: ST.historia?ST.historia.titulo:'',
-        endereco: ST.formato==='impresso'?ST.endereco:null
+        nome: ST.personagens[0]?ST.personagens[0].nome:'',
+        origem: ST.cupom_aplicado?('cupom_'+ST.cupom_aplicado):'criar_livro'
       })
     });
   }catch(e){ /* não bloqueia o fluxo se falhar */ }
@@ -3700,22 +3696,67 @@ async function enviarLivro(){
     +'<div class="loading-txt">Gerando o PDF do livro...</div>'
     +'<div class="loading-sub">Preparando para enviar</div></div>';
 
-  // Gera PDF
+  // 1) Gera PDF (download local também ocorre dentro de gerarPDFReal)
+  var pdfResult=null;
   try{
-    await gerarPDF();
-    mostrarConfirmacaoEnvio();
+    pdfResult=await gerarPDF();
   }catch(e){
-    mostrarConfirmacaoEnvio();
+    console.error('Erro gerarPDF:',e);
   }
+
+  // 2) Se temos PDF, registra pedido no backend (salva no Supabase + envia email Resend + incrementa cupom)
+  if(pdfResult&&pdfResult.pdf){
+    c.innerHTML='<div class="loading-wrap"><div class="loading-spinner"></div>'
+      +'<div class="loading-txt">Enviando seu Squishbook...</div>'
+      +'<div class="loading-sub">Salvando e disparando email</div></div>';
+    try{
+      var pdfBase64=pdfResult.pdf.output('datauristring'); // já vem com prefixo data:application/pdf;base64,
+      var fmtObj=FORMATOS.filter(function(f){return f.id===ST.formato;})[0];
+      var valorOriginal=(fmtObj?fmtObj.p:39)+ST.extras*PRECO_EXTRA;
+      var resp=await fetch('https://squishbook-backend-v2.onrender.com/api/finalizar-pedido',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          nome_crianca: ST.personagens[0]?ST.personagens[0].nome:'',
+          comprador: ST.email||emailDestino, // quem comprou
+          email: emailDestino,                // quem recebe o livro
+          whatsapp: ST.telefone||'',
+          roteiro: ST.roteiro||'',
+          pdf_base64: pdfBase64,
+          pdf_filename: pdfResult.filename,
+          cupom_codigo: ST.cupom_aplicado||null,
+          valor_original: valorOriginal
+        })
+      });
+      var data=await resp.json();
+      if(!resp.ok){
+        console.error('finalizar-pedido falhou:',data);
+        // Mostra confirmação mesmo assim — PDF já está local com o cliente
+        mostrarConfirmacaoEnvio({erro:data.erro||'Falha ao registrar pedido'});
+        return;
+      }
+      ST.numero_pedido=data.numero;
+      mostrarConfirmacaoEnvio({numero:data.numero});
+      return;
+    }catch(e){
+      console.error('Erro finalizar-pedido:',e);
+      mostrarConfirmacaoEnvio({erro:e.message||'Falha de conexão'});
+      return;
+    }
+  }
+
+  // Fallback: PDF não foi gerado mas mostra confirmação assim mesmo
+  mostrarConfirmacaoEnvio();
 }
 
 async function gerarPDF(){
   // Tenta gerar PDF real com jspdf + html2canvas
   // Se não disponível, usa a janela printável como fallback
   if(typeof window.jspdf !== 'undefined' || typeof window.jsPDF !== 'undefined'){
-    await gerarPDFReal();
+    return await gerarPDFReal();
   } else {
     gerarPDFFallback();
+    return null;
   }
 }
 
@@ -3940,6 +3981,7 @@ async function gerarPDFReal(){
   // Download automático
   var nomeArquivo='Squishbook_'+proto.nome.replace(/\s+/g,'_')+'_'+ST.historia.titulo.replace(/\s+/g,'_').substring(0,30)+'.pdf';
   pdf.save(nomeArquivo);
+  return { pdf: pdf, filename: nomeArquivo };
 }
 
 function gerarPDFFallback(){
@@ -4057,18 +4099,33 @@ function carregarImagem(url){
   });
 }
 
-function mostrarConfirmacaoEnvio(){
+function mostrarConfirmacaoEnvio(opts){
+  opts=opts||{};
   var c=document.getElementById('cardContent');
   var dest=POS.opcaoEnvio==='comprador'?ST.email:POS.emailDestino;
+  var headerEmoji=opts.erro?'\u26A0\uFE0F':'\u{1F4E8}';
+  var headerTit=opts.erro?'PDF baixado, mas houve um aviso':'Presente enviado!';
+  var corpo='';
+  if(opts.erro){
+    corpo='<p class="sucesso-desc">'
+      +'O PDF do livro <strong>"'+ST.historia.titulo+'"</strong> foi baixado para o seu computador.<br/><br/>'
+      +'\u26A0\uFE0F Tivemos um problema ao registrar o pedido e enviar o email automaticamente. '
+      +'Guarde o PDF baixado e nos avise pelo WhatsApp se precisar de ajuda.<br/><br/>'
+      +'<small style="color:var(--texto-sec)">Detalhe técnico: '+(opts.erro||'')+'</small>'
+      +'</p>';
+  } else {
+    corpo='<p class="sucesso-desc">'
+      +'O livro <strong>"'+ST.historia.titulo+'"</strong> foi enviado para <strong>'+dest+'</strong>.<br/><br/>'
+      +(POS.mensagem?'Sua mensagem foi incluida na ultima pagina do livro.<br/><br/>':'')
+      +'O PDF tambem foi baixado automaticamente para o seu computador.<br/><br/>'
+      +(opts.numero?'<small style="color:var(--texto-sec)">N\u00famero do pedido: <strong>'+opts.numero+'</strong></small><br/><br/>':'')
+      +'Obrigado por escolher o <strong>Squishbook</strong>! \u{1F499}<br/>'
+      +'<small style="color:var(--texto-sec)">Feito com amor pelo Benicio \u{1F31F}</small></p>';
+  }
   c.innerHTML='<div class="sucesso-wrap">'
-    +'<span class="sucesso-emoji">\u{1F4E8}</span>'
-    +'<h2 class="sucesso-titulo">Presente enviado!</h2>'
-    +'<p class="sucesso-desc">'
-    +'O livro <strong>"'+ST.historia.titulo+'"</strong> foi enviado para <strong>'+dest+'</strong>.<br/><br/>'
-    +(POS.mensagem?'Sua mensagem foi incluida na ultima pagina do livro.<br/><br/>':'')
-    +'O PDF tambem foi baixado automaticamente para o seu computador.<br/><br/>'
-    +'Obrigado por escolher o <strong>Squishbook</strong>! \u{1F499}<br/>'
-    +'<small style="color:var(--texto-sec)">Feito com amor pelo Benicio \u{1F31F}</small></p>'
+    +'<span class="sucesso-emoji">'+headerEmoji+'</span>'
+    +'<h2 class="sucesso-titulo">'+headerTit+'</h2>'
+    +corpo
     +'<div class="btn-row" style="margin-top:28px;justify-content:center">'
     +'<a href="index.html" class="btn btn-primary">Criar outro livro</a>'
     +'</div></div>';
