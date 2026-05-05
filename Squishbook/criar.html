@@ -2400,7 +2400,7 @@ async function gerarCenas(){
         // a foto e reproduzir a cor exata, qualquer que seja ela.
         var promptChibi = 'Transform the person from @image1 into a chibi kawaii watercolor character. '
           + 'The character is ' + tipoPessoa + ', inspired by the reference photo @image1 in chibi watercolor style with a soft rounded face. '
-          + 'EYE COLOR INSTRUCTION (CRITICAL): carefully examine the actual iris color of the person\'s eyes in the reference photo @image1, then reproduce EXACTLY that same iris color in the chibi character\'s eyes. The chibi eyes are stylized large and glossy, BUT the iris color must match the photo precisely whether the photo shows blue, gray, green, hazel, brown, or any other natural eye color. Do not invent a different eye color. Do not pick a default. Match the photo. '
+          + 'EYE COLOR INSTRUCTION (CRITICAL): carefully examine the actual iris color of the person\'s eyes in the reference photo @image1, then reproduce EXACTLY that same iris color in the chibi character\'s eyes. The chibi eyes are stylized large and glossy, BUT the iris color must match the photo precisely whether the photo shows blue, gray, green, hazel, brown, or any other natural eye color. Both eyes must have the SAME identical iris color (perfect symmetry, no heterochromia, no different colors between left and right eye). Do not invent a different eye color. Do not pick a default. Match the photo. '
           + 'Standing in a neutral straight pose, facing the viewer, arms relaxed at sides, gentle natural smile. '
           + 'Full body visible from head to feet, centered in the image. '
           + 'Plain soft pastel cream background, no scenery, no props, no other characters, no text. '
@@ -2967,7 +2967,7 @@ function descricaoPersonagemV4(p){
     else if(gf.faixa==='elderly' && gf.genero==='female') papel=' (a grandmother)';
     else if(gf.faixa==='elderly' && gf.genero==='male') papel=' (a grandfather)';
   }
-  return base + papel + ', inspired by the reference photo in chibi watercolor style, including the natural iris eye color shown in the reference photo (match the photo eye color whether blue, gray, green, hazel or brown, do not invent a different color)';
+  return base + papel + ', inspired by the reference photo in chibi watercolor style, including the natural iris eye color shown in the reference photo (match the photo eye color whether blue, gray, green, hazel or brown, do not invent a different color, both eyes must have the same identical iris color with perfect symmetry, no heterochromia)';
 }
 
 // Detecta se a cena precisa de reforço de escala (adulto + criança juntos).
@@ -3038,7 +3038,7 @@ function construirPromptV4(parsNaPg, cenario, acao, expressao, roteiro, atmosfer
   }
 
   cenaTexto += atmosfera + '. ';
-  cenaTexto += 'No text, no watermark.';
+  cenaTexto += 'No text, no watermark, no signs, no labels, no shop signs, no books with visible titles, no posters, no graffiti, no written words of any kind in any language anywhere in the image.';
 
   return cenaTexto;
 }
@@ -3190,24 +3190,25 @@ async function gerarCenaPagina(pg,idx){
   // Expressão por página (preservado da v3)
   var expressao='joyful and curious';
   if(combinado.indexOf('assust')>-1||combinado.indexOf('medo')>-1||combinado.indexOf('tremeu')>-1) expressao='scared but brave, wide nervous eyes';
-  else if(combinado.indexOf('triste')>-1||combinado.indexOf('chor')>-1) expressao='sad and emotional, teary eyes';
+  else if(combinado.indexOf('triste')>-1||combinado.indexOf('chor')>-1||combinado.indexOf('lagrim')>-1||combinado.indexOf('lágrim')>-1||combinado.indexOf('soluç')>-1||combinado.indexOf('soluc')>-1||combinado.indexOf('desesper')>-1||combinado.indexOf('perdid')>-1) expressao='sad and emotional, teary eyes, mouth gently downturned';
   else if(combinado.indexOf('alegr')>-1||combinado.indexOf('feliz')>-1||combinado.indexOf('sorri')>-1||combinado.indexOf('rindo')>-1) expressao='very happy, big beaming smile';
   else if(combinado.indexOf('corag')>-1||combinado.indexOf('heroi')>-1||combinado.indexOf('determin')>-1) expressao='brave and determined';
-  else if(combinado.indexOf('surpres')>-1||combinado.indexOf('espant')>-1||combinado.indexOf('incrivel')>-1) expressao='amazed and surprised';
+  else if(combinado.indexOf('surpres')>-1||combinado.indexOf('espant')>-1||combinado.indexOf('incrivel')>-1||combinado.indexOf('incrível')>-1) expressao='amazed and surprised';
   else if(combinado.indexOf('dormi')>-1||combinado.indexOf('sonho')>-1) expressao='sleepy and dreamy';
   else if(combinado.indexOf('corr')>-1||combinado.indexOf('brinc')>-1) expressao='excited and playful';
-  else if(combinado.indexOf('abraco')>-1||combinado.indexOf('amor')>-1||combinado.indexOf('junto')>-1) expressao='warm and loving';
+  else if(combinado.indexOf('abrac')>-1||combinado.indexOf('amor')>-1||combinado.indexOf('junto')>-1||combinado.indexOf('beij')>-1||combinado.indexOf('carinh')>-1) expressao='warm and loving, soft tender smile';
   if(roteiro==='terror') expressao='scared but curious, wide glowing eyes';
 
   // Ação conjunta entre personagens (preservado da v3)
   var acaoConjunta='interacting naturally, physically close together in the scene';
   if(parsNaPg.length>=2){
-    if(combinado.indexOf('abraco')>-1||combinado.indexOf('abraca')>-1||combinado.indexOf('junto')>-1||combinado.indexOf('apertad')>-1) acaoConjunta='hugging each other warmly, faces close, emotional and tender';
+    if(combinado.indexOf('abrac')>-1||combinado.indexOf('junto')>-1||combinado.indexOf('apertad')>-1||combinado.indexOf('envolv')>-1) acaoConjunta='hugging each other warmly with both arms wrapped around, faces close, emotional and tender expressions';
+    else if(combinado.indexOf('beij')>-1) acaoConjunta='one giving the other a tender kiss on the cheek or forehead, both eyes gently closed, very loving and warm';
     else if(combinado.indexOf('corr')>-1||combinado.indexOf('brinc')>-1||combinado.indexOf('pula')>-1) acaoConjunta='running and playing together, holding hands, arms wide with joy';
     else if(combinado.indexOf('assust')>-1||combinado.indexOf('medo')>-1||combinado.indexOf('tremeu')>-1) acaoConjunta='one holding the other protectively, both scared';
+    else if(combinado.indexOf('chor')>-1||combinado.indexOf('lagrim')>-1||combinado.indexOf('lágrim')>-1||combinado.indexOf('triste')>-1||combinado.indexOf('soluç')>-1||combinado.indexOf('soluc')>-1) acaoConjunta='one comforting the other with a gentle hand on shoulder, both with sad tender expressions, no smiles';
     else if(combinado.indexOf('descobr')>-1||combinado.indexOf('encontr')>-1||combinado.indexOf('olha')>-1) acaoConjunta='both pointing and looking at something together with wide amazed eyes';
     else if(combinado.indexOf('ajud')>-1||combinado.indexOf('segur')>-1||combinado.indexOf('mao')>-1) acaoConjunta='holding hands, one helping the other forward';
-    else if(combinado.indexOf('chora')>-1||combinado.indexOf('lagrima')>-1||combinado.indexOf('triste')>-1) acaoConjunta='one comforting the other with a gentle hand on shoulder';
     else if(combinado.indexOf('celebr')>-1||combinado.indexOf('vitoria')>-1||combinado.indexOf('feliz')>-1) acaoConjunta='both jumping with arms raised in celebration, huge smiles';
     else if(combinado.indexOf('conversa')>-1||combinado.indexOf('fala')>-1||combinado.indexOf('diz')>-1) acaoConjunta='facing each other, one talking expressively, the other listening';
     else acaoConjunta='physically together, clearly interacting, facing each other or touching';
@@ -3724,7 +3725,20 @@ async function enviarLivro(){
     document.getElementById('erroEnvio').classList.add('show'); return;
   }
 
-  var emailDestino=POS.opcaoEnvio==='comprador'?ST.email:POS.emailDestino;
+  // Define destinatário principal e secundário conforme opção:
+  //   'comprador'   -> só email do comprador
+  //   'presenteado' -> só email do presenteado
+  //   'ambos'       -> comprador (principal) + presenteado (secundário)
+  var emailDestino;
+  var emailSecundario = null;
+  if(POS.opcaoEnvio==='comprador'){
+    emailDestino = ST.email;
+  } else if(POS.opcaoEnvio==='presenteado'){
+    emailDestino = POS.emailDestino;
+  } else { // ambos
+    emailDestino = ST.email;
+    emailSecundario = POS.emailDestino;
+  }
 
   var c=document.getElementById('cardContent');
   c.innerHTML='<div class="loading-wrap"><div class="loading-spinner"></div>'
@@ -3754,7 +3768,8 @@ async function enviarLivro(){
         body:JSON.stringify({
           nome_crianca: ST.personagens[0]?ST.personagens[0].nome:'',
           comprador: ST.email||emailDestino, // quem comprou
-          email: emailDestino,                // quem recebe o livro
+          email: emailDestino,                // destinatário principal
+          email_secundario: emailSecundario,  // 2º destinatário (opção 'ambos'), null caso contrário
           whatsapp: ST.telefone||'',
           roteiro: ST.roteiro||'',
           pdf_base64: pdfBase64,
@@ -3895,7 +3910,7 @@ async function gerarPDFReal(){
         // (capa estava saindo com olho castanho default contra foto de olho claro).
         var promptCapaV4 = 'Transform the person from @image1 into a chibi kawaii watercolor character for a children\'s book cover. '
           + 'The character is ' + tipoCapa + ', inspired by the reference photo @image1 in chibi watercolor style. '
-          + 'EYE COLOR (CRITICAL): examine the actual iris color in the reference photo @image1 and reproduce EXACTLY that same iris color in the chibi. Match the photo whether eyes are blue, gray, green, hazel, or brown. Do not pick a default. Do not invent a color. '
+          + 'EYE COLOR (CRITICAL): examine the actual iris color in the reference photo @image1 and reproduce EXACTLY that same iris color in the chibi. Both eyes must have the SAME identical iris color (perfect symmetry, no heterochromia, no different colors between left and right eye). Match the photo whether eyes are blue, gray, green, hazel, or brown. Do not pick a default. Do not invent a color. '
           + 'Portrait composition: character centered in the image, facing the viewer, '
           + 'with a big joyful smile and arms open wide in a welcoming pose. '
           + 'Character fills the center and upper half of the image. '
