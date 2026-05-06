@@ -2456,8 +2456,8 @@ async function gerarCenas(){
         // Determina gênero/idade pra ancorar prompt
         var gf = detectaGeneroFaixa(p);
         var tipoPessoa;
-        if(gf.faixa==='baby/toddler') tipoPessoa = gf.genero==='female' ? 'a kawaii chibi BABY GIRL character with very small playful proportions and a round soft face, dressed in feminine baby clothing' : 'a kawaii chibi BABY BOY character with very small playful proportions and a round soft face, dressed in masculine baby clothing';
-        else if(gf.faixa==='child') tipoPessoa = gf.genero==='female' ? 'a kawaii chibi LITTLE GIRL character with small playful proportions and a soft rounded face, dressed in feminine girl clothing (skirt, dress, or pants - feminine style)' : 'a kawaii chibi LITTLE BOY character with small playful proportions and a soft rounded face, dressed in masculine boy clothing (shorts, pants, t-shirt - masculine style, NEVER a dress, NEVER a skirt)';
+        if(gf.faixa==='baby/toddler') tipoPessoa = gf.genero==='female' ? 'a kawaii chibi character with very small playful proportions and a round soft face' : 'a kawaii chibi character with very small playful proportions and a round soft face';
+        else if(gf.faixa==='child') tipoPessoa = gf.genero==='female' ? 'a kawaii chibi character with small playful proportions and a soft rounded face' : 'a kawaii chibi character with small playful proportions and a soft rounded face';
         else if(gf.faixa==='teenager') tipoPessoa = gf.genero==='female' ? 'a teenage girl' : 'a teenage boy';
         else tipoPessoa = gf.genero==='female' ? 'a grown adult woman aged 30 to 40, with mature adult facial features (defined cheekbones, slim adult jawline, NOT a round childlike face), tall slim adult body proportions, NOT a teenager, NOT a schoolgirl' : 'a grown adult man aged 30 to 40, with mature adult facial features and tall adult body proportions';
 
@@ -3030,8 +3030,8 @@ function filtrarCenarioV4(cenario, qtdPersonagens){
 function descricaoPersonagemV4(p){
   var gf = detectaGeneroFaixa(p);
   var base = '';
-  if(gf.faixa==='baby/toddler') base = gf.genero==='female' ? 'a kawaii chibi BABY GIRL character with very small playful proportions and a round soft face, dressed in feminine baby clothing' : 'a kawaii chibi BABY BOY character with very small playful proportions and a round soft face, dressed in masculine baby clothing';
-  else if(gf.faixa==='child') base = gf.genero==='female' ? 'a kawaii chibi LITTLE GIRL character with small playful proportions and a soft rounded face, dressed in feminine girl clothing (skirt, dress, or pants - feminine style)' : 'a kawaii chibi LITTLE BOY character with small playful proportions and a soft rounded face, dressed in masculine boy clothing (shorts, pants, t-shirt - masculine style, NEVER a dress, NEVER a skirt)';
+  if(gf.faixa==='baby/toddler') base = gf.genero==='female' ? 'a kawaii chibi character with very small playful proportions and a round soft face' : 'a kawaii chibi character with very small playful proportions and a round soft face';
+  else if(gf.faixa==='child') base = gf.genero==='female' ? 'a kawaii chibi character with small playful proportions and a soft rounded face' : 'a kawaii chibi character with small playful proportions and a soft rounded face';
   else if(gf.faixa==='teenager') base = gf.genero==='female' ? 'a teenage girl' : 'a teenage boy';
   // Sessão 6 patch (28/04 23:50): adulto com proporção explícita e idade quantificada.
   else if(gf.faixa==='adult') base = gf.genero==='female' ? 'a grown adult woman aged 30 to 40 with mature adult facial features (defined cheekbones, slim adult jawline) and tall adult body proportions (longer legs and torso than a child), clearly NOT a teenager, NOT a schoolgirl, NOT a child' : 'a grown adult man aged 30 to 40 with mature adult facial features and tall adult body proportions, NOT a teenager';
@@ -3854,7 +3854,12 @@ async function enviarLivro(){
           pdf_base64: pdfBase64,
           pdf_filename: pdfResult.filename,
           cupom_codigo: ST.cupom_aplicado||null,
-          valor_original: valorOriginal
+          valor_original: valorOriginal,
+          external_reference: ST.external_reference||null  // Sessão 7 (05/05 23:15):
+                                                            // PRE-... gerado quando criou
+                                                            // a preference do MP. Backend
+                                                            // usa pra ligar pedido ao
+                                                            // pagamento no verificar-pagamento.
         })
       });
       var data=await resp.json();
@@ -3978,32 +3983,17 @@ async function gerarPDFReal(){
         // Descri\u00e7\u00e3o do protagonista com g\u00eanero/idade ancorados (mesmo padr\u00e3o do miolo)
         var gfCapa = detectaGeneroFaixa(protCapa);
         var tipoCapa = '';
-        if(gfCapa.faixa==='baby/toddler') tipoCapa = gfCapa.genero==='female' ? 'a kawaii chibi BABY GIRL character with very small playful proportions and a round soft face, dressed in feminine baby clothing' : 'a kawaii chibi BABY BOY character with very small playful proportions and a round soft face, dressed in masculine baby clothing';
-        else if(gfCapa.faixa==='child') tipoCapa = gfCapa.genero==='female' ? 'a kawaii chibi LITTLE GIRL character with small playful proportions and a soft rounded face, dressed in feminine girl clothing (skirt, dress, or pants - feminine style)' : 'a kawaii chibi LITTLE BOY character with small playful proportions and a soft rounded face, dressed in masculine boy clothing (shorts, pants, t-shirt - masculine style, NEVER a dress, NEVER a skirt, NEVER pink ruffled clothing)';
+        if(gfCapa.faixa==='baby/toddler') tipoCapa = gfCapa.genero==='female' ? 'a kawaii chibi character with very small playful proportions and a round soft face' : 'a kawaii chibi character with very small playful proportions and a round soft face';
+        else if(gfCapa.faixa==='child') tipoCapa = gfCapa.genero==='female' ? 'a kawaii chibi character with small playful proportions and a soft rounded face' : 'a kawaii chibi character with small playful proportions and a soft rounded face';
         else if(gfCapa.faixa==='teenager') tipoCapa = gfCapa.genero==='female' ? 'a teenage girl' : 'a teenage boy';
-        else tipoCapa = gfCapa.genero==='female' ? 'a kawaii chibi female character with small playful proportions, dressed in feminine clothing' : 'a kawaii chibi male character with small playful proportions, dressed in masculine clothing';
+        else tipoCapa = gfCapa.genero==='female' ? 'a kawaii chibi character with small playful proportions' : 'a kawaii chibi character with small playful proportions';
 
         // Prompt de capa: composi\u00e7\u00e3o retrato, personagem centralizado, fundo tem\u00e1tico
         // Prompt de capa: composição retrato, personagem centralizado, fundo temático
         // Sessão 6 patch v3 (29/04 23:30): instrução neutra pra cor real dos olhos
         // (capa estava saindo com olho castanho default contra foto de olho claro).
-        // Sessão 7 (05/05 22:30): reforço CRÍTICO de gênero na capa.
-        // Bug observado em produção (pedido SQ-MOTCRYWN-G9E): Beni (menino, child)
-        // saiu na capa com vestido cor de rosa e laço. Causa: ternário tipoCapa
-        // tinha strings idênticas pra male/female. Tema "Dia das Mães" + flores
-        // pastel ancoravam o modelo pra menina por viés do dataset. Fix: tipoCapa
-        // agora diferencia explicitamente, e o prompt repete o gênero como ordem
-        // direta. Faixa etária inclui "child" e "baby/toddler" (toda base de clientes).
-        var generoEnfaseCapa = '';
-        if(gfCapa.genero==='male' && (gfCapa.faixa==='child' || gfCapa.faixa==='baby/toddler')){
-          generoEnfaseCapa = 'GENDER (CRITICAL): the character is a BOY (masculine child). Masculine clothing only - shorts, pants, t-shirt, hoodie, or boyish outfit. ABSOLUTELY NEVER a dress, NEVER a skirt, NEVER pink ruffled clothing, NEVER feminine accessories. Short masculine hairstyle. The fact that the book theme involves Mother\'s Day or flowers does NOT change the gender of the child - this is a BOY giving a present to his mother. ';
-        } else if(gfCapa.genero==='female' && (gfCapa.faixa==='child' || gfCapa.faixa==='baby/toddler')){
-          generoEnfaseCapa = 'GENDER (CRITICAL): the character is a GIRL (feminine child). Feminine clothing - dress, skirt, or feminine outfit. ';
-        }
-
         var promptCapaV4 = 'Transform the person from @image1 into a chibi kawaii watercolor character for a children\'s book cover. '
           + 'The character is ' + tipoCapa + ', inspired by the reference photo @image1 in chibi watercolor style. '
-          + generoEnfaseCapa
           + 'EYE COLOR (CRITICAL): examine the actual iris color in the reference photo @image1 and reproduce EXACTLY that same iris color in the chibi. Both eyes must have the SAME identical iris color (perfect symmetry, no heterochromia, no different colors between left and right eye). Match the photo whether eyes are blue, gray, green, hazel, or brown. Do not pick a default. Do not invent a color. '
           + 'Portrait composition: character centered in the image, facing the viewer, '
           + 'with a big joyful smile and arms open wide in a welcoming pose. '
