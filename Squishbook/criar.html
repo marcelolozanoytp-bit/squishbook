@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -2466,13 +2467,16 @@ async function gerarCenas(){
         else tipoPessoa = gf.genero==='female' ? 'a grown adult woman aged 30 to 40, with mature adult facial features (defined cheekbones, slim adult jawline, NOT a round childlike face), tall slim adult body proportions, NOT a teenager, NOT a schoolgirl' : 'a grown adult man aged 30 to 40, with mature adult facial features and tall adult body proportions';
 
         // Sessão 6 patch (28/04 23:50): reforço de escala para adultos.
-        // Problema observado no PDF de 23:43: chibi adulto saiu com proporção de criança,
-        // gerando p\u00e1ginas onde a M\u00e3e parece adolescente ou menor que o filho (p\u00e1g 6).
-        // Solu\u00e7\u00e3o: pedir explicitamente "modified chibi adult" \u2014 o estilo aquarela do livro,
-        // mas com altura/cabe\u00e7a/corpo de adulto. N\u00e3o \u00e9 chibi puro.
+        // Sessão 7 (06/05 22:55): reforço V2. Bug observado no PDF de 22:32:
+        // Mamãe saiu do tamanho do Beni em 5+ páginas (5, 9, 10, 11, 12).
+        // Hipótese: chibi canônico inicial sai com proporções chibi (cabeça
+        // grande/corpo curto) e depois vira referência VISUAL pras cenas.
+        // FLUX no multi-reference dá mais peso à referência visual que ao
+        // texto. Solução: forçar proporções adultas no chibi canônico via
+        // ratios numéricos explícitos.
         var modifierProp = '';
         if(gf.faixa==='adult' || gf.faixa==='elderly'){
-          modifierProp = ' Modified chibi proportions for adult: large expressive eyes and rosy cheeks (chibi style), BUT body and head ratio of an adult human (head smaller than chibi child, body length of an adult, longer legs, taller frame). The character must read clearly as an adult woman/man, not a child.';
+          modifierProp = ' ADULT BODY PROPORTIONS (CRITICAL): The character is an adult, NOT chibi-toddler proportions. Body must occupy at least 80% of vertical frame. Head-to-body ratio is 1:6 (adult ratio), NOT 1:3 (child chibi ratio). Legs are long and slender (50% of total body height). Torso is elongated. Shoulders are wider than head. Mature adult facial structure: defined jawline, refined nose, NOT a round childlike face. Adult clothing: NO school uniform, NO plaid skirt, NO knee socks, NO schoolgirl outfit, NO pigtails. The character must read unambiguously as a 30-40 year old parent, never as a teenager or child.';
         }
 
         // Prompt LIMPO: fundo neutro, pose neutra, full body, sem ação
@@ -3046,8 +3050,8 @@ function descricaoPersonagemV4(p){
   // Adiciona papel se for familiar/amigo (contexto que ajuda o modelo)
   var papel = '';
   if(p.papel==='familiar'){
-    if(gf.faixa==='adult' && gf.genero==='female') papel=' (a real mother, adult age 30 to 40, clearly an adult, taller than a child)';
-    else if(gf.faixa==='adult' && gf.genero==='male') papel=' (a real father, adult age 30 to 40, clearly an adult, taller than a child)';
+    if(gf.faixa==='adult' && gf.genero==='female') papel=' (a real mother, adult woman aged 30 to 40, body height 80% of vertical frame, head-to-body ratio 1:6 NOT chibi 1:3, long adult legs, elongated torso, defined adult jawline, NO plaid skirt NO school uniform NO pigtails NO knee socks, MUST be visibly taller than child characters)';
+    else if(gf.faixa==='adult' && gf.genero==='male') papel=' (a real father, adult man aged 30 to 40, body height 80% of vertical frame, head-to-body ratio 1:6 NOT chibi 1:3, long adult legs, mature adult features, MUST be visibly taller than child characters)';
     else if(gf.faixa==='elderly' && gf.genero==='female') papel=' (a grandmother)';
     else if(gf.faixa==='elderly' && gf.genero==='male') papel=' (a grandfather)';
   }
@@ -3064,11 +3068,11 @@ function reforcoEscalaV4(personagens){
   var temAdulto = gfs.some(function(g){return g.faixa==='adult' || g.faixa==='elderly';});
   var temCrianca = gfs.some(function(g){return g.faixa==='child' || g.faixa==='baby/toddler';});
   if(temAdulto && temCrianca){
-    // Sessão 6 patch (28/04 23:50): reforço duplicado e mais agressivo.
-    // Problema observado: em algumas páginas (especialmente as últimas) o adulto
-    // aparece com altura igual ou menor que a criança. Solução: ancorar altura
-    // numericamente E repetir três vezes em formas diferentes.
-    return ' SCALE RULE (CRITICAL): The adult must be visibly taller than the child. The child\'s head must reach approximately the adult\'s chest or shoulder, NOT the adult\'s head. The adult\'s body is significantly longer than the child\'s body. Adult body proportions: longer legs, longer torso, smaller head-to-body ratio than a child. The adult has mature adult facial features (defined jawline, refined nose, NOT a round childlike face), adult clothing (no school uniform, no plaid skirt, no knee socks, no schoolgirl outfit), and is a real grown-up parent, not a teenager. If the scene shows them side by side, the height difference must be obvious and the adult must dominate vertically.';
+    // Sessão 7 (06/05 22:55): reforço V3 com instruções numéricas explícitas.
+    // Sessão 6 reforço V2 falhou: Mamãe ainda sai do tamanho do Beni em 5+ páginas
+    // (testes 22:32 e anteriores). Hipótese: instruções qualitativas ("taller")
+    // são fracas frente ao chibi-bias do FLUX. Solução: ratios numéricos.
+    return ' SCALE RULE (ABSOLUTE CRITICAL, HIGHEST PRIORITY): The adult character is approximately 1.6x taller than the child character. Adult body height occupies 90% of the vertical frame; child body height occupies approximately 60-65% of the vertical frame. The child\'s head reaches the adult\'s sternum or shoulder, NEVER the adult\'s face level. Adult head-to-body ratio is 1:6 (slim chibi adult). Child head-to-body ratio is 1:3 (round chibi child). The visual height difference must be IMMEDIATELY OBVIOUS in the composition. The adult has fully mature adult facial features (defined jawline, refined nose, NOT a round childlike face), adult body shape (broader shoulders, longer legs, elongated torso), and NO youth markers (NO school uniform, NO plaid skirt, NO knee socks, NO schoolgirl outfit, NO pigtails). The adult is a real grown-up parent in their 30s or 40s, never a teenager, never a young woman, never a schoolgirl. If they appear side by side in any pose (standing, sitting, hugging, kneeling), the height difference must remain proportional to their real ages. ';
   }
   return '';
 }
@@ -3103,14 +3107,20 @@ function construirPromptV4(parsNaPg, cenario, acao, expressao, roteiro, atmosfer
     cenaTexto += refs[0] + '. ';
     cenaTexto += 'The illustration shows exactly one character, alone in the scene, with an empty and clean background around them. ';
   } else {
-    cenaTexto = 'Transform the people from @image1 and @image2 into chibi kawaii watercolor characters together in the same scene. ';
+    // Sessão 7 (06/05 22:55): reforço de escala movido pra ABERTURA do prompt.
+    // FLUX dá mais peso aos primeiros tokens. Antes ficava depois das refs e
+    // estava sendo ignorado.
+    var escalaPriori = reforcoEscalaV4(parsNaPg);
+    cenaTexto = escalaPriori;
+    cenaTexto += 'Transform the people from @image1 and @image2 into chibi kawaii watercolor characters together in the same scene. ';
     cenaTexto += 'Action: ' + acao + '. ';
     cenaTexto += 'Setting: ' + cenario + '. ';
     cenaTexto += refs.join('. ') + '. ';
-    cenaTexto += reforcoEscalaV4(parsNaPg);
     // Sessão 5: anti-transferência de estampa entre @image1 e @image2
     cenaTexto += ' Each character keeps their own clothing pattern; do not mix patterns or prints between characters. ';
     cenaTexto += ' The illustration shows exactly these two characters together, alone in the scene, with an empty and clean background around them. ';
+    // Reforço final - lembrete de que escala sobrepõe estilo chibi padrão
+    cenaTexto += escalaPriori;
   }
 
   cenaTexto += 'Full body visible for all characters, including legs and feet. ';
