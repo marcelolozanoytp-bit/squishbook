@@ -555,7 +555,7 @@ function logGeracao(dados){
 
 var ST = {
   step: 1,
-  personagens: [{id:1, nome:'', papel:'protagonista', genero:'', faixaEtaria:'', fotoUrl:null, avatarUrl:null, avatarErro:false, avatarErroMsg:''}],
+  personagens: [{id:1, nome:'', papel:'protagonista', genero:'', faixaEtaria:'', fotoUrl:null, avatarUrl:null, avatarErro:false, avatarErroMsg:'', roupa:''}],
   idadeCrianca: '',
   estiloAuto: null,
   estiloFinal: null,
@@ -770,6 +770,9 @@ function renderPers(){
       +'<select onchange="ST.personagens['+i+'].genero=this.value">'+opcoesGenero+'</select>'
       +'<select onchange="ST.personagens['+i+'].faixaEtaria=this.value">'+opcoesFaixa+'</select>'
       +'</div>'
+      +'<div style="margin-top:8px"><label style="font-size:.72rem;color:#888;font-weight:600;display:block;margin-bottom:4px">Roupa preferida (opcional)</label>'
+      +'<input type="text" placeholder="Ex: vestido azul de festa, camiseta do Vasco..." value="'+(p.roupa||'')+'" oninput="ST.personagens['+i+'].roupa=this.value" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:.82rem"/>'
+      +'<div style="font-size:.66rem;color:#aaa;margin-top:3px">Se vazio, o personagem aparece com roupa casual padrão</div></div>'
       +'</div>'+removeBtn+'</div>';
   }
   l.innerHTML = html;
@@ -897,7 +900,7 @@ function tentarAdd(){
   } else { addP(); }
 }
 function confirmExtra(ov){ ov.remove(); ST.extras++; addP(); }
-function addP(){ ST.personagens.push({id:nextId++,nome:'',papel:'familiar',genero:'',faixaEtaria:'',fotoUrl:null,avatarUrl:null,avatarErro:false,avatarErroMsg:''}); renderPers(); }
+function addP(){ ST.personagens.push({id:nextId++,nome:'',papel:'familiar',genero:'',faixaEtaria:'',fotoUrl:null,avatarUrl:null,avatarErro:false,avatarErroMsg:'',roupa:''}); renderPers(); }
 function remP(id){
   var idx=ST.personagens.findIndex(function(p){return p.id===id;});
   if(idx>=4) ST.extras=Math.max(0,ST.extras-1);
@@ -1285,7 +1288,7 @@ async function gerarHistoria(){
     clearInterval(iv);
     if(data.content&&data.content[0]&&data.content[0].text){
       var raw=data.content[0].text.trim().replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
-      ST.historia=JSON.parse(raw);
+      ST.historia=JSON.parse(raw.normalize('NFC'));
       // Gera resumo da historia para preview pre-pagamento (2-3 frases)
       if(!ST.historia.resumo){
         var textoBase=ST.estiloFinal==='visual'
@@ -2326,7 +2329,7 @@ async function confirmarAjusteHistoria(modalId){
     var data=await res.json();
     if(data.content&&data.content[0]&&data.content[0].text){
       var raw=data.content[0].text.trim().replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
-      ST.historia=JSON.parse(raw);
+      ST.historia=JSON.parse(raw.normalize('NFC'));
     }
     mostrarAprovacaoHistoria(c);
   }catch(e){
@@ -2461,8 +2464,9 @@ async function gerarCenas(){
         // tinha strings IDENTICAS nos dois lados do ternario, entao o token
         // de genero nao chegava ao FLUX. Cenas alternavam Beni entre
         // menino/menina aleatoriamente. Fix: strings explicitas.
-        if(gf.faixa==='baby/toddler') tipoPessoa = gf.genero==='female' ? 'a kawaii chibi BABY GIRL with very small playful proportions, round soft face, wearing a dress or feminine baby clothes (NEVER a boys outfit)' : 'a kawaii chibi BABY BOY with very small playful proportions, round soft face, wearing a t-shirt and shorts or boys clothing (NEVER a dress, NEVER a skirt)';
-        else if(gf.faixa==='child') tipoPessoa = gf.genero==='female' ? 'a kawaii chibi LITTLE GIRL with small playful proportions, soft rounded face, wearing a dress or feminine clothes (NEVER masculine clothing)' : 'a kawaii chibi LITTLE BOY with small playful proportions, soft rounded face, wearing a t-shirt and shorts or boys clothing (NEVER a dress, NEVER a skirt, NEVER pink ruffled clothing)';
+        var roupaCustom = (p.roupa && p.roupa.trim()) ? ('wearing ' + p.roupa.trim()) : null;
+        if(gf.faixa==='baby/toddler') tipoPessoa = gf.genero==='female' ? 'a kawaii chibi BABY GIRL with very small playful proportions, round soft face, ' + (roupaCustom || 'wearing a dress or feminine baby clothes (NEVER a boys outfit)') : 'a kawaii chibi BABY BOY with very small playful proportions, round soft face, ' + (roupaCustom || 'wearing a t-shirt and shorts or boys clothing (NEVER a dress, NEVER a skirt)');
+        else if(gf.faixa==='child') tipoPessoa = gf.genero==='female' ? 'a kawaii chibi LITTLE GIRL with small playful proportions, soft rounded face, ' + (roupaCustom || 'wearing a dress or feminine clothes (NEVER masculine clothing)') : 'a kawaii chibi LITTLE BOY with small playful proportions, soft rounded face, ' + (roupaCustom || 'wearing a t-shirt and shorts or boys clothing (NEVER a dress, NEVER a skirt, NEVER pink ruffled clothing)');
         else if(gf.faixa==='teenager') tipoPessoa = gf.genero==='female' ? 'a teenage girl' : 'a teenage boy';
         else tipoPessoa = gf.genero==='female' ? 'a grown adult woman aged 30 to 40, with mature adult facial features (defined cheekbones, slim adult jawline, NOT a round childlike face), tall slim adult body proportions, NOT a teenager, NOT a schoolgirl' : 'a grown adult man aged 30 to 40, with mature adult facial features and tall adult body proportions';
 
@@ -2487,7 +2491,7 @@ async function gerarCenas(){
         // a foto e reproduzir a cor exata, qualquer que seja ela.
         var promptChibi = 'Transform the person from @image1 into a chibi kawaii watercolor character. '
           + 'The character is ' + tipoPessoa + ', inspired by the reference photo @image1 in chibi watercolor style with a soft rounded face. '
-          + 'EYE COLOR INSTRUCTION (CRITICAL): carefully examine the actual iris color of the person\'s eyes in the reference photo @image1, then reproduce EXACTLY that same iris color in the chibi character\'s eyes. The chibi eyes are stylized large and glossy, BUT the iris color must match the photo precisely whether the photo shows blue, gray, green, hazel, brown, or any other natural eye color. Both eyes must have the SAME identical iris color (perfect symmetry, no heterochromia, no different colors between left and right eye). Do not invent a different eye color. Do not pick a default. Match the photo. '
+          + 'HAIR COLOR INSTRUCTION (CRITICAL): carefully examine the natural hair color of the person in the reference photo @image1 (look at root color, not styled tips). Reproduce EXACTLY that same hair color in the chibi character. If the photo shows brown hair, use brown. If light brown, use light brown. If dark blonde, use dark blonde. If black, use black. NEVER default to bright yellow or platinum blonde unless the photo clearly shows that. NEVER lighten the hair. SKIN TONE INSTRUCTION (CRITICAL): match the skin tone from the photo @image1. EYE COLOR INSTRUCTION (CRITICAL): carefully examine the actual iris color of the person\'s eyes in the reference photo @image1, then reproduce EXACTLY that same iris color in the chibi character\'s eyes. The chibi eyes are stylized large and glossy, BUT the iris color must match the photo precisely whether the photo shows blue, gray, green, hazel, brown, or any other natural eye color. Both eyes must have the SAME identical iris color (perfect symmetry, no heterochromia, no different colors between left and right eye). Do not invent a different eye color. Do not pick a default. Match the photo. '
           + 'Standing in a neutral straight pose, facing the viewer, arms relaxed at sides, gentle natural smile. '
           + 'Full body visible from head to feet, centered in the image. '
           + 'Plain soft pastel cream background, no scenery, no props, no other characters, no text. '
@@ -3039,8 +3043,9 @@ function descricaoPersonagemV4(p){
   var gf = detectaGeneroFaixa(p);
   var base = '';
   // Sessão 7 (06/05 00:10): RE-fix do bug do gênero alternando.
-  if(gf.faixa==='baby/toddler') base = gf.genero==='female' ? 'a kawaii chibi BABY GIRL with very small playful proportions and a round soft face, wearing feminine baby clothing' : 'a kawaii chibi BABY BOY with very small playful proportions and a round soft face, wearing a t-shirt and shorts (NEVER a dress, NEVER a skirt)';
-  else if(gf.faixa==='child') base = gf.genero==='female' ? 'a kawaii chibi LITTLE GIRL with small playful proportions and a soft rounded face, wearing feminine clothing' : 'a kawaii chibi LITTLE BOY with small playful proportions and a soft rounded face, wearing a t-shirt and shorts or boys clothing (NEVER a dress, NEVER a skirt, NEVER pink ruffled clothing)';
+  var roupaC = (p && p.roupa && p.roupa.trim()) ? ('wearing ' + p.roupa.trim()) : null;
+  if(gf.faixa==='baby/toddler') base = gf.genero==='female' ? 'a kawaii chibi BABY GIRL with very small playful proportions and a round soft face, ' + (roupaC || 'wearing feminine baby clothing') : 'a kawaii chibi BABY BOY with very small playful proportions and a round soft face, ' + (roupaC || 'wearing a t-shirt and shorts (NEVER a dress, NEVER a skirt)');
+  else if(gf.faixa==='child') base = gf.genero==='female' ? 'a kawaii chibi LITTLE GIRL with small playful proportions and a soft rounded face, ' + (roupaC || 'wearing feminine clothing') : 'a kawaii chibi LITTLE BOY with small playful proportions and a soft rounded face, ' + (roupaC || 'wearing a t-shirt and shorts or boys clothing (NEVER a dress, NEVER a skirt, NEVER pink ruffled clothing)');
   else if(gf.faixa==='teenager') base = gf.genero==='female' ? 'a teenage girl' : 'a teenage boy';
   // Sessão 6 patch (28/04 23:50): adulto com proporção explícita e idade quantificada.
   else if(gf.faixa==='adult') base = gf.genero==='female' ? 'a grown adult woman aged 30 to 40 with mature adult facial features (defined cheekbones, slim adult jawline) and tall adult body proportions (longer legs and torso than a child), clearly NOT a teenager, NOT a schoolgirl, NOT a child' : 'a grown adult man aged 30 to 40 with mature adult facial features and tall adult body proportions, NOT a teenager';
@@ -3055,7 +3060,7 @@ function descricaoPersonagemV4(p){
     else if(gf.faixa==='elderly' && gf.genero==='female') papel=' (a grandmother)';
     else if(gf.faixa==='elderly' && gf.genero==='male') papel=' (a grandfather)';
   }
-  return base + papel + ', inspired by the reference photo in chibi watercolor style, including the natural iris eye color shown in the reference photo (match the photo eye color whether blue, gray, green, hazel or brown, do not invent a different color, both eyes must have the same identical iris color with perfect symmetry, no heterochromia)';
+  return base + papel + ', inspired by the reference photo in chibi watercolor style, preserving the natural hair color from the photo (match exactly: if brown use brown, if light brown use light brown, if dark blonde use dark blonde, if black use black; never default to bright yellow blonde unless the photo clearly shows blonde), preserving the natural skin tone from the photo, and preserving the natural iris eye color shown in the reference photo (match the photo eye color whether blue, gray, green, hazel or brown, do not invent a different color, both eyes must have the same identical iris color with perfect symmetry, no heterochromia)';
 }
 
 // Detecta se a cena precisa de reforço de escala (adulto + criança juntos).
@@ -3802,7 +3807,7 @@ async function aplicarAjuste(){
     if(data.content&&data.content[0]&&data.content[0].text){
       var raw=data.content[0].text.trim().replace(/^```json\s*/,'').replace(/```\s*$/,'').trim();
       try{
-        var novaHistoria=JSON.parse(raw);
+        var novaHistoria=JSON.parse(raw.normalize('NFC'));
         ST.historia=novaHistoria;
       }catch(e){}
     }
@@ -3995,8 +4000,9 @@ async function gerarPDFReal(){
         var tipoCapa = '';
         // Sessão 7 (06/05 00:10): RE-fix do bug do gênero. Strings explicitas
         // pra forcar token de genero no FLUX.
-        if(gfCapa.faixa==='baby/toddler') tipoCapa = gfCapa.genero==='female' ? 'a kawaii chibi BABY GIRL with very small playful proportions and a round soft face, wearing feminine baby clothing' : 'a kawaii chibi BABY BOY with very small playful proportions and a round soft face, wearing a t-shirt and shorts (NEVER a dress, NEVER a skirt)';
-        else if(gfCapa.faixa==='child') tipoCapa = gfCapa.genero==='female' ? 'a kawaii chibi LITTLE GIRL with small playful proportions and a soft rounded face, wearing feminine clothing' : 'a kawaii chibi LITTLE BOY with small playful proportions and a soft rounded face, wearing a t-shirt and shorts or boys clothing (NEVER a dress, NEVER a skirt, NEVER pink ruffled clothing)';
+        var roupaCapa = (proto && proto.roupa && proto.roupa.trim()) ? ('wearing ' + proto.roupa.trim()) : null;
+        if(gfCapa.faixa==='baby/toddler') tipoCapa = gfCapa.genero==='female' ? 'a kawaii chibi BABY GIRL with very small playful proportions and a round soft face, ' + (roupaCapa || 'wearing feminine baby clothing') : 'a kawaii chibi BABY BOY with very small playful proportions and a round soft face, ' + (roupaCapa || 'wearing a t-shirt and shorts (NEVER a dress, NEVER a skirt)');
+        else if(gfCapa.faixa==='child') tipoCapa = gfCapa.genero==='female' ? 'a kawaii chibi LITTLE GIRL with small playful proportions and a soft rounded face, ' + (roupaCapa || 'wearing feminine clothing') : 'a kawaii chibi LITTLE BOY with small playful proportions and a soft rounded face, ' + (roupaCapa || 'wearing a t-shirt and shorts or boys clothing (NEVER a dress, NEVER a skirt, NEVER pink ruffled clothing)');
         else if(gfCapa.faixa==='teenager') tipoCapa = gfCapa.genero==='female' ? 'a teenage girl' : 'a teenage boy';
         else tipoCapa = gfCapa.genero==='female' ? 'a kawaii chibi character with small playful proportions' : 'a kawaii chibi character with small playful proportions';
 
@@ -4015,7 +4021,7 @@ async function gerarPDFReal(){
         var promptCapaV4 = 'Transform the person from @image1 into a chibi kawaii watercolor character for a children\'s book cover. '
           + 'The character is ' + tipoCapa + ', inspired by the reference photo @image1 in chibi watercolor style. '
           + generoEnfaseCapa + ' '
-          + 'EYE COLOR (CRITICAL): examine the actual iris color in the reference photo @image1 and reproduce EXACTLY that same iris color in the chibi. Both eyes must have the SAME identical iris color (perfect symmetry, no heterochromia, no different colors between left and right eye). Match the photo whether eyes are blue, gray, green, hazel, or brown. Do not pick a default. Do not invent a color. '
+          + 'HAIR COLOR (CRITICAL): examine the natural hair color in the reference photo @image1 and reproduce EXACTLY that same color in the chibi. If brown, use brown. If light brown, use light brown. If dark blonde, use dark blonde. If black, use black. NEVER default to bright yellow blonde unless photo clearly shows it. NEVER lighten. SKIN TONE (CRITICAL): match the skin tone from the photo precisely. EYE COLOR (CRITICAL): examine the actual iris color in the reference photo @image1 and reproduce EXACTLY that same iris color in the chibi. Both eyes must have the SAME identical iris color (perfect symmetry, no heterochromia, no different colors between left and right eye). Match the photo whether eyes are blue, gray, green, hazel, or brown. Do not pick a default. Do not invent a color. '
           + 'Portrait composition: character centered in the image, facing the viewer, '
           + 'with a big joyful smile and arms open wide in a welcoming pose. '
           + 'Character fills the center and upper half of the image. '
@@ -4067,7 +4073,7 @@ async function gerarPDFReal(){
       +'<img src="'+capaImageUrl+'" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;object-position:center top"/>'      // Gradiente escuro na base para legibilidade do texto
       +'<div style="position:absolute;bottom:0;left:0;right:0;height:340px;background:linear-gradient(to top,rgba(0,0,0,.85) 0%,rgba(0,0,0,.6) 50%,transparent 100%)"></div>'      // Badge SQUISHBOOK no topo
       +'<div style="position:absolute;top:24px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,.2);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.4);border-radius:30px;padding:5px 20px;font-size:9px;color:white;letter-spacing:.28em;text-transform:uppercase;font-family:Arial,sans-serif;white-space:nowrap">SQUISHBOOK</div>'      // Texto na base da imagem
-      +'<div style="position:absolute;bottom:0;left:0;right:0;padding:28px 32px;text-align:center">'      +'<div style="font-size:'+titFontSize+';font-weight:900;color:white;line-height:1.15;text-shadow:0 2px 20px rgba(0,0,0,.8);font-family:Arial,sans-serif;margin-bottom:10px">'+ST.historia.titulo+'</div>'      +'<div style="width:60px;height:2px;background:rgba(255,255,255,.6);margin:0 auto 10px"></div>'      +'<div style="font-size:10px;color:rgba(255,255,255,.75);margin-bottom:4px;font-family:Arial,sans-serif">Uma historia criada especialmente para</div>'      +'<div style="font-size:20px;font-weight:900;color:white;text-shadow:0 2px 12px rgba(0,0,0,.6);font-family:Arial,sans-serif;margin-bottom:4px">'+proto.nome+'</div>'      +'<div style="font-size:8px;color:rgba(255,255,255,.3);letter-spacing:.2em;text-transform:uppercase;font-family:Arial,sans-serif;margin-top:8px">UM PRESENTE UNICO NO MUNDO</div>'      +'</div>'      +'</div>';
+      +'<div style="position:absolute;bottom:0;left:0;right:0;padding:28px 32px;text-align:center">'      +'<div style="font-size:'+titFontSize+';font-weight:900;color:white;line-height:1.15;text-shadow:0 2px 20px rgba(0,0,0,.8);font-family:Arial,sans-serif;margin-bottom:10px">'+ST.historia.titulo+'</div>'      +'<div style="width:60px;height:2px;background:rgba(255,255,255,.6);margin:0 auto 10px"></div>'      +'<div style="font-size:10px;color:rgba(255,255,255,.95);margin-bottom:4px;font-family:Arial,sans-serif;text-shadow:0 1px 6px rgba(0,0,0,.8)">Uma história criada especialmente para</div>'      +'<div style="font-size:20px;font-weight:900;color:white;text-shadow:0 2px 12px rgba(0,0,0,.6);font-family:Arial,sans-serif;margin-bottom:4px">'+proto.nome+'</div>'      +'<div style="font-size:8px;color:rgba(255,255,255,.85);letter-spacing:.2em;text-transform:uppercase;font-family:Arial,sans-serif;margin-top:8px;text-shadow:0 1px 8px rgba(0,0,0,.9)">UM PRESENTE ÚNICO NO MUNDO</div>'      +'</div>'      +'</div>';
   } else {
     // CAPA SEM IMAGEM: gradiente com avatares em destaque maior
     var capasHtmlGrande='';
@@ -4075,7 +4081,7 @@ async function gerarPDFReal(){
       var src2=ST.personagens[i].avatarUrl;
       if(src2) capasHtmlGrande+='<img src="'+src2+'" style="width:110px;height:110px;border-radius:50%;border:4px solid rgba(255,255,255,.7);object-fit:cover;margin:0 -6px;display:inline-block;box-shadow:0 6px 24px rgba(0,0,0,.4)"/>';
     }
-    capaHtml='<div style="width:595px;height:842px;background:linear-gradient(160deg,'+pal.bg1+' 0%,'+pal.bg2+' 45%,'+pal.bg3+' 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:44px 32px;position:relative;overflow:hidden;box-sizing:border-box">'      +'<div style="position:absolute;top:-80px;right:-80px;width:280px;height:280px;border-radius:50%;background:rgba(255,255,255,.05)"></div>'      +'<div style="position:absolute;bottom:-70px;left:-70px;width:240px;height:240px;border-radius:50%;background:rgba(255,255,255,.04)"></div>'      +'<div style="display:inline-block;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:30px;padding:5px 20px;font-size:9px;color:rgba(255,255,255,.8);letter-spacing:.28em;text-transform:uppercase;margin-bottom:24px;font-family:Arial,sans-serif">SQUISHBOOK</div>'      +(capasHtmlGrande?'<div style="margin-bottom:28px;display:flex;justify-content:center;align-items:center">'+capasHtmlGrande+'</div>':'')      +'<div style="font-size:'+titFontSize+';font-weight:900;color:white;margin-bottom:12px;line-height:1.15;text-shadow:0 4px 32px rgba(0,0,0,.5);font-family:Arial,sans-serif">'+ST.historia.titulo+'</div>'      +'<div style="width:80px;height:2px;background:rgba(255,255,255,.5);margin:10px auto"></div>'      +'<div style="font-size:11px;color:rgba(255,255,255,.65);margin-bottom:5px;font-family:Arial,sans-serif">Uma historia criada especialmente para</div>'      +'<div style="font-size:22px;font-weight:900;color:white;text-shadow:0 2px 16px rgba(0,0,0,.3);font-family:Arial,sans-serif">'+proto.nome+'</div>'      +'<div style="margin-top:20px;font-size:9px;color:rgba(255,255,255,.28);letter-spacing:.2em;text-transform:uppercase;font-family:Arial,sans-serif">UM PRESENTE UNICO NO MUNDO</div>'      +'</div>';
+    capaHtml='<div style="width:595px;height:842px;background:linear-gradient(160deg,'+pal.bg1+' 0%,'+pal.bg2+' 45%,'+pal.bg3+' 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:44px 32px;position:relative;overflow:hidden;box-sizing:border-box">'      +'<div style="position:absolute;top:-80px;right:-80px;width:280px;height:280px;border-radius:50%;background:rgba(255,255,255,.05)"></div>'      +'<div style="position:absolute;bottom:-70px;left:-70px;width:240px;height:240px;border-radius:50%;background:rgba(255,255,255,.04)"></div>'      +'<div style="display:inline-block;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:30px;padding:5px 20px;font-size:9px;color:rgba(255,255,255,.8);letter-spacing:.28em;text-transform:uppercase;margin-bottom:24px;font-family:Arial,sans-serif">SQUISHBOOK</div>'      +(capasHtmlGrande?'<div style="margin-bottom:28px;display:flex;justify-content:center;align-items:center">'+capasHtmlGrande+'</div>':'')      +'<div style="font-size:'+titFontSize+';font-weight:900;color:white;margin-bottom:12px;line-height:1.15;text-shadow:0 4px 32px rgba(0,0,0,.5);font-family:Arial,sans-serif">'+ST.historia.titulo+'</div>'      +'<div style="width:80px;height:2px;background:rgba(255,255,255,.5);margin:10px auto"></div>'      +'<div style="font-size:11px;color:rgba(255,255,255,.65);margin-bottom:5px;font-family:Arial,sans-serif">Uma história criada especialmente para</div>'      +'<div style="font-size:22px;font-weight:900;color:white;text-shadow:0 2px 16px rgba(0,0,0,.3);font-family:Arial,sans-serif">'+proto.nome+'</div>'      +'<div style="margin-top:20px;font-size:9px;color:rgba(255,255,255,.7);letter-spacing:.2em;text-transform:uppercase;font-family:Arial,sans-serif;text-shadow:0 1px 4px rgba(0,0,0,.5)">UM PRESENTE ÚNICO NO MUNDO</div>'      +'</div>';
   }
   var capaCanvas=await capturarPagina(capaHtml,'#'+pal.bg1.replace('#',''));
   pdf.addImage(capaCanvas.toDataURL('image/jpeg',0.92),'JPEG',0,0,pgW,pgH);
@@ -4214,7 +4220,7 @@ function gerarPDFFallback(){
     +(capasHtml?'<div style="display:flex;justify-content:center;align-items:flex-end;margin-bottom:18px">'+capasHtml+'</div>':'')
     +'<div style="font-family:\'Baloo 2\',\'Arial Black\',sans-serif;font-size:'+titFontSize+';font-weight:900;color:white;margin-bottom:10px;line-height:1.15;text-shadow:0 4px 32px rgba(0,0,0,.5)">'+ST.historia.titulo+'</div>'
     +'<div style="width:80px;height:2px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.6),transparent);margin:10px auto"></div>'
-    +'<div style="font-size:11px;color:rgba(255,255,255,.65);margin-bottom:5px">Uma historia criada especialmente para</div>'
+    +'<div style="font-size:11px;color:rgba(255,255,255,.65);margin-bottom:5px">Uma história criada especialmente para</div>'
     +'<div style="font-size:22px;font-weight:900;color:white;font-family:\'Baloo 2\',sans-serif;text-shadow:0 2px 16px rgba(0,0,0,.3)">'+proto.nome+'</div>'
     +'<div style="margin-top:26px;font-size:9px;color:rgba(255,255,255,.28);letter-spacing:.2em;text-transform:uppercase">Um presente unico no mundo</div>'
     +'</div></div>'
