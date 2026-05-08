@@ -2876,21 +2876,22 @@ async function extrairLockData(imageUrl, personagens){
   var listaP = personagens.map(function(p){return p.nome;}).join(', ');
   try{
     var prompt = 'Look at this children\'s book illustration. The characters are: '+listaP+'.\n'
-      +'For each character, describe their clothing and distinctive physical features so a future image can keep them visually consistent.\n\n'
+      +'For each character, describe their clothing and distinctive physical features so a future image can keep them visually consistent across other pages of the same book.\n\n'
       +'Return ONLY valid JSON (no markdown fences, no preamble). Schema:\n'
       +'{\n'
       +'  "personagens": [\n'
       +'    {\n'
       +'      "nome": "exact name from the list",\n'
-      +'      "wardrobe": "short English description of the outfit, max 20 words. Be specific about colors, patterns, garment types. Example: yellow t-shirt with a blue shark print, dark blue denim shorts, white sneakers",\n'
-      +'      "features": "short English description of distinctive features that should stay constant, max 15 words. Focus on eye color, hair color, hair style. Example: short brown hair, big blue eyes, rosy cheeks"\n'
+      +'      "wardrobe": "short English description of the outfit. Be specific about colors, patterns, garment types. Example: white short-sleeve t-shirt, dark gray denim shorts, white sneakers with white laces",\n'
+      +'      "features": "EXTREMELY specific description of stable physical traits. MUST include: (1) precise hair color using one of these exact terms - black, dark brown, medium brown, light brown, chestnut brown, dark blonde, golden blonde, light blonde, red, auburn, gray; (2) precise hair length and style; (3) precise eye color using one of these exact terms - dark brown, light brown, hazel, green, blue, gray; (4) skin tone. Example: medium brown hair with short choppy bangs covering the forehead, dark brown eyes, fair skin"\n'
       +'    }\n'
       +'  ]\n'
       +'}\n\n'
       +'Rules:\n'
       +'- ONLY include characters from the list above. Do NOT invent or include extra characters.\n'
-      +'- wardrobe must capture EVERY visible garment (top, bottom, shoes, accessories).\n'
-      +'- features focuses ONLY on stable traits (eye color, hair). Do NOT include facial expression or pose.\n'
+      +'- wardrobe must capture EVERY visible garment (top, bottom, shoes, accessories) with specific colors.\n'
+      +'- features MUST commit to a single specific color word for hair and eyes. Do NOT use vague terms like "brownish" or "light colored". Pick ONE exact term from the lists above. This is critical because subsequent pages will use this description to maintain consistency.\n'
+      +'- features focuses ONLY on stable traits. Do NOT include facial expression, mouth shape, or pose.\n'
       +'- All values in English.';
 
     var res = await fetch('https://squishbook-backend-v2.onrender.com/api/historia', {
@@ -3089,19 +3090,46 @@ function construirPromptV4(parsNaPg, cenario, acao, expressao, roteiro, atmosfer
     var p = parsNaPg[i];
     var tag = '@image' + (i+1);
     var desc = descricaoPersonagemV4(p);
-    // Sessão 5: anexa wardrobe + features ao descritor do personagem se houver lock
-    if(lockData && lockData[p.nome]){
-      var lk = lockData[p.nome];
-      if(lk.wardrobe) desc += ', wearing: ' + lk.wardrobe;
-      if(lk.features) desc += ', identifying features: ' + lk.features;
-    }
+    // Sessão 8 (08/05): lockData migrado pro lockBlock no início do prompt
+    // (mais peso em tokens). Bloco antigo desativado pra evitar duplicação:
+    // if(lockData && lockData[p.nome]){
+    //   var lk = lockData[p.nome];
+    //   if(lk.wardrobe) desc += ', wearing: ' + lk.wardrobe;
+    //   if(lk.features) desc += ', identifying features: ' + lk.features;
+    // }
     refs.push(tag + ' is ' + desc);
     imagens.push(p);
   }
 
+  // Sessão 8 (08/05): bloco MANDATORY com features e wardrobe DOS personagens
+  // que tiverem lock. Vai antes do prompt principal pra ganhar peso de tokens.
+  var lockBlock = '';
+  if(lockData && parsNaPg.length > 0){
+    var lockLines = [];
+    for(var li=0; li<parsNaPg.length; li++){
+      var pli = parsNaPg[li];
+      if(lockData[pli.nome]){
+        var lk2 = lockData[pli.nome];
+        var lineParts = [];
+        if(lk2.features) lineParts.push(lk2.features);
+        if(lk2.wardrobe) lineParts.push('wearing ' + lk2.wardrobe);
+        if(lineParts.length > 0){
+          var tagLi = '@image' + (li+1);
+          lockLines.push(tagLi + ' (' + pli.nome + '): ' + lineParts.join('; '));
+        }
+      }
+    }
+    if(lockLines.length > 0){
+      lockBlock = 'CHARACTER CONSISTENCY (CRITICAL — these traits MUST stay identical across every page of this book): '
+        + lockLines.join(' | ')
+        + '. Do NOT change hair color, hair style, eye color, skin tone, or clothing between pages. The same character must look the same in every illustration. ';
+    }
+  }
+
   var cenaTexto = '';
   if(parsNaPg.length === 1){
-    cenaTexto = 'Transform the person from ' + refs[0].split(' is ')[0] + ' into a chibi kawaii watercolor character. ';
+    cenaTexto = lockBlock;
+    cenaTexto += 'Transform the person from ' + refs[0].split(' is ')[0] + ' into a chibi kawaii watercolor character. ';
     cenaTexto += acao + '. ';
     cenaTexto += 'Setting: ' + cenario + '. ';
     cenaTexto += refs[0] + '. ';
@@ -3111,7 +3139,7 @@ function construirPromptV4(parsNaPg, cenario, acao, expressao, roteiro, atmosfer
     // FLUX dá mais peso aos primeiros tokens. Antes ficava depois das refs e
     // estava sendo ignorado.
     var escalaPriori = reforcoEscalaV4(parsNaPg);
-    cenaTexto = escalaPriori;
+    cenaTexto = lockBlock + escalaPriori;
     cenaTexto += 'Transform the people from @image1 and @image2 into chibi kawaii watercolor characters together in the same scene. ';
     cenaTexto += 'Action: ' + acao + '. ';
     cenaTexto += 'Setting: ' + cenario + '. ';
@@ -4067,7 +4095,7 @@ async function gerarPDFReal(){
       +'<img src="'+capaImageUrl+'" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;object-position:center top"/>'      // Gradiente escuro na base para legibilidade do texto
       +'<div style="position:absolute;bottom:0;left:0;right:0;height:340px;background:linear-gradient(to top,rgba(0,0,0,.85) 0%,rgba(0,0,0,.6) 50%,transparent 100%)"></div>'      // Badge SQUISHBOOK no topo
       +'<div style="position:absolute;top:24px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,.2);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.4);border-radius:30px;padding:5px 20px;font-size:9px;color:white;letter-spacing:.28em;text-transform:uppercase;font-family:Arial,sans-serif;white-space:nowrap">SQUISHBOOK</div>'      // Texto na base da imagem
-      +'<div style="position:absolute;bottom:0;left:0;right:0;padding:28px 32px;text-align:center">'      +'<div style="font-size:'+titFontSize+';font-weight:900;color:white;line-height:1.15;text-shadow:0 2px 20px rgba(0,0,0,.8);font-family:Arial,sans-serif;margin-bottom:10px">'+ST.historia.titulo+'</div>'      +'<div style="width:60px;height:2px;background:rgba(255,255,255,.6);margin:0 auto 10px"></div>'      +'<div style="font-size:10px;color:rgba(255,255,255,.75);margin-bottom:4px;font-family:Arial,sans-serif">Uma história criada especialmente para</div>'      +'<div style="font-size:20px;font-weight:900;color:white;text-shadow:0 2px 12px rgba(0,0,0,.6);font-family:Arial,sans-serif;margin-bottom:4px">'+proto.nome+'</div>'      +'<div style="font-size:8px;color:rgba(255,255,255,.3);letter-spacing:.2em;text-transform:uppercase;font-family:Arial,sans-serif;margin-top:8px">UM PRESENTE ÚNICO NO MUNDO</div>'      +'</div>'      +'</div>';
+      +'<div style="position:absolute;bottom:0;left:0;right:0;padding:28px 32px;text-align:center">'      +'<div style="font-size:'+titFontSize+';font-weight:900;color:white;line-height:1.15;text-shadow:0 2px 20px rgba(0,0,0,.8);font-family:Arial,sans-serif;margin-bottom:10px">'+ST.historia.titulo+'</div>'      +'<div style="width:60px;height:2px;background:rgba(255,255,255,.6);margin:0 auto 10px"></div>'      +'<div style="font-size:10px;color:rgba(255,255,255,.75);margin-bottom:4px;font-family:Arial,sans-serif">Uma história criada especialmente para</div>'      +'<div style="font-size:20px;font-weight:900;color:white;text-shadow:0 2px 12px rgba(0,0,0,.6);font-family:Arial,sans-serif;margin-bottom:4px">'+proto.nome+'</div>'      +'<div style="font-size:8px;color:rgba(255,255,255,.95);letter-spacing:.2em;text-transform:uppercase;font-family:Arial,sans-serif;margin-top:8px;text-shadow:0 1px 4px rgba(0,0,0,.8)">UM PRESENTE ÚNICO NO MUNDO</div>'      +'</div>'      +'</div>';
   } else {
     // CAPA SEM IMAGEM: gradiente com avatares em destaque maior
     var capasHtmlGrande='';
@@ -4075,7 +4103,7 @@ async function gerarPDFReal(){
       var src2=ST.personagens[i].avatarUrl;
       if(src2) capasHtmlGrande+='<img src="'+src2+'" style="width:110px;height:110px;border-radius:50%;border:4px solid rgba(255,255,255,.7);object-fit:cover;margin:0 -6px;display:inline-block;box-shadow:0 6px 24px rgba(0,0,0,.4)"/>';
     }
-    capaHtml='<div style="width:595px;height:842px;background:linear-gradient(160deg,'+pal.bg1+' 0%,'+pal.bg2+' 45%,'+pal.bg3+' 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:44px 32px;position:relative;overflow:hidden;box-sizing:border-box">'      +'<div style="position:absolute;top:-80px;right:-80px;width:280px;height:280px;border-radius:50%;background:rgba(255,255,255,.05)"></div>'      +'<div style="position:absolute;bottom:-70px;left:-70px;width:240px;height:240px;border-radius:50%;background:rgba(255,255,255,.04)"></div>'      +'<div style="display:inline-block;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:30px;padding:5px 20px;font-size:9px;color:rgba(255,255,255,.8);letter-spacing:.28em;text-transform:uppercase;margin-bottom:24px;font-family:Arial,sans-serif">SQUISHBOOK</div>'      +(capasHtmlGrande?'<div style="margin-bottom:28px;display:flex;justify-content:center;align-items:center">'+capasHtmlGrande+'</div>':'')      +'<div style="font-size:'+titFontSize+';font-weight:900;color:white;margin-bottom:12px;line-height:1.15;text-shadow:0 4px 32px rgba(0,0,0,.5);font-family:Arial,sans-serif">'+ST.historia.titulo+'</div>'      +'<div style="width:80px;height:2px;background:rgba(255,255,255,.5);margin:10px auto"></div>'      +'<div style="font-size:11px;color:rgba(255,255,255,.65);margin-bottom:5px;font-family:Arial,sans-serif">Uma história criada especialmente para</div>'      +'<div style="font-size:22px;font-weight:900;color:white;text-shadow:0 2px 16px rgba(0,0,0,.3);font-family:Arial,sans-serif">'+proto.nome+'</div>'      +'<div style="margin-top:20px;font-size:9px;color:rgba(255,255,255,.28);letter-spacing:.2em;text-transform:uppercase;font-family:Arial,sans-serif">UM PRESENTE ÚNICO NO MUNDO</div>'      +'</div>';
+    capaHtml='<div style="width:595px;height:842px;background:linear-gradient(160deg,'+pal.bg1+' 0%,'+pal.bg2+' 45%,'+pal.bg3+' 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:44px 32px;position:relative;overflow:hidden;box-sizing:border-box">'      +'<div style="position:absolute;top:-80px;right:-80px;width:280px;height:280px;border-radius:50%;background:rgba(255,255,255,.05)"></div>'      +'<div style="position:absolute;bottom:-70px;left:-70px;width:240px;height:240px;border-radius:50%;background:rgba(255,255,255,.04)"></div>'      +'<div style="display:inline-block;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:30px;padding:5px 20px;font-size:9px;color:rgba(255,255,255,.8);letter-spacing:.28em;text-transform:uppercase;margin-bottom:24px;font-family:Arial,sans-serif">SQUISHBOOK</div>'      +(capasHtmlGrande?'<div style="margin-bottom:28px;display:flex;justify-content:center;align-items:center">'+capasHtmlGrande+'</div>':'')      +'<div style="font-size:'+titFontSize+';font-weight:900;color:white;margin-bottom:12px;line-height:1.15;text-shadow:0 4px 32px rgba(0,0,0,.5);font-family:Arial,sans-serif">'+ST.historia.titulo+'</div>'      +'<div style="width:80px;height:2px;background:rgba(255,255,255,.5);margin:10px auto"></div>'      +'<div style="font-size:11px;color:rgba(255,255,255,.65);margin-bottom:5px;font-family:Arial,sans-serif">Uma história criada especialmente para</div>'      +'<div style="font-size:22px;font-weight:900;color:white;text-shadow:0 2px 16px rgba(0,0,0,.3);font-family:Arial,sans-serif">'+proto.nome+'</div>'      +'<div style="margin-top:20px;font-size:9px;color:rgba(255,255,255,.85);letter-spacing:.2em;text-transform:uppercase;font-family:Arial,sans-serif;text-shadow:0 1px 3px rgba(0,0,0,.5)">UM PRESENTE ÚNICO NO MUNDO</div>'      +'</div>';
   }
   var capaCanvas=await capturarPagina(capaHtml,'#'+pal.bg1.replace('#',''));
   pdf.addImage(capaCanvas.toDataURL('image/jpeg',0.92),'JPEG',0,0,pgW,pgH);
