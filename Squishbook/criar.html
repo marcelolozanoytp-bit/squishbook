@@ -3184,8 +3184,16 @@ function construirPromptV4(parsNaPg, cenario, acao, expressao, roteiro, atmosfer
   var cenaTexto = '';
   if(parsNaPg.length === 1){
     cenaTexto = lockBlock;
-    cenaTexto += 'Transform the person from ' + refs[0].split(' is ')[0] + ' into a chibi kawaii watercolor character. ';
-    cenaTexto += acao + '. ';
+    // FIX 09/05 — modo PRESERVE em vez de TRANSFORM. A referência @image1 já é
+    // o chibi canônico pronto (gerado uma vez em ETAPA 1.5). Não pode ser
+    // re-transformado, senão FLUX reinterpreta idade, cabelo, roupa e
+    // proporção a cada cena. Instrução nova diz pra COPIAR a aparência da
+    // referência e só mudar cenário/pose/expressão.
+    cenaTexto += 'Place the EXACT SAME chibi character from ' + refs[0].split(' is ')[0] + ' into a new scene. ';
+    cenaTexto += 'The reference image is ALREADY in chibi watercolor style — DO NOT redesign or reinterpret it. ';
+    cenaTexto += 'Preserve the character exactly as shown in the reference: same hair length, same hair style, same hair color, same clothing, same body proportions, same age, same facial features, same skin tone. ';
+    cenaTexto += 'Only the setting, pose, and facial expression change. ';
+    cenaTexto += 'Action: ' + acao + '. ';
     cenaTexto += 'Setting: ' + cenario + '. ';
     cenaTexto += refs[0] + '. ';
     cenaTexto += 'The illustration shows exactly one character, alone in the scene, with an empty and clean background around them. ';
@@ -3195,7 +3203,19 @@ function construirPromptV4(parsNaPg, cenario, acao, expressao, roteiro, atmosfer
     // estava sendo ignorado.
     var escalaPriori = reforcoEscalaV4(parsNaPg);
     cenaTexto = escalaPriori + lockBlock;
-    cenaTexto += 'Transform the people from @image1 and @image2 into chibi kawaii watercolor characters together in the same scene. ';
+    // FIX 09/05 — modo PRESERVE em vez de TRANSFORM. As referências @image1 e
+    // @image2 JÁ SÃO os chibis canônicos finais (gerados em ETAPA 1.5 e
+    // perfeitos: Mamãe adulta com cabelo longo + blusa branca + jeans;
+    // Vittorio criança com camiseta e bermuda). O prompt antigo "Transform...
+    // into chibi characters" fazia FLUX re-renderizar do zero, ignorando a
+    // referência e gerando "Mamãe-criança com franja" em metade das cenas.
+    // Novo prompt instrui copiar identidade da referência e só variar cenário,
+    // pose e expressão.
+    cenaTexto += 'Place the EXACT SAME chibi characters from @image1 and @image2 together into a new scene. ';
+    cenaTexto += 'The reference images are ALREADY in chibi watercolor style — DO NOT redesign or reinterpret them. ';
+    cenaTexto += 'Preserve each character exactly as shown in their reference image: same hair length, same hair style, same hair color, same clothing (top, bottom, shoes), same body proportions, same age appearance, same facial features, same skin tone. ';
+    cenaTexto += 'Only the setting, pose, and facial expressions change between scenes. ';
+    cenaTexto += 'Each character keeps their own identity from their own reference: @image1 stays exactly like @image1, @image2 stays exactly like @image2. ';
     cenaTexto += 'Action: ' + acao + '. ';
     cenaTexto += 'Setting: ' + cenario + '. ';
     cenaTexto += refs.join('. ') + '. ';
@@ -4091,11 +4111,17 @@ async function gerarPDFReal(){
           generoEnfaseCapa = ' GENDER (CRITICAL): the protagonist is FEMALE, a GIRL. Feminine clothing only.';
         }
 
-        // Prompt de capa: composi\u00e7\u00e3o retrato, personagem centralizado, fundo tem\u00e1tico
         // Prompt de capa: composição retrato, personagem centralizado, fundo temático
         // Sessão 6 patch v3 (29/04 23:30): instrução neutra pra cor real dos olhos
         // (capa estava saindo com olho castanho default contra foto de olho claro).
-        var promptCapaV4 = 'Transform the person from @image1 into a chibi kawaii watercolor character for a children\'s book cover. '
+        // FIX 09/05 — quando a fonte é chibi canônico (já em estilo chibi), usa
+        // modo PRESERVE pra não reinterpretar identidade. Quando é foto realista
+        // (fallback se chibi falhou), usa modo TRANSFORM normal.
+        var usandoChibiCanonicoCapa = !!protCapa.chibiAvatarUrl;
+        var aberturaCapa = usandoChibiCanonicoCapa
+          ? 'Place the EXACT SAME chibi character from @image1 onto a new book cover. The reference is ALREADY in chibi watercolor style — DO NOT redesign or reinterpret it. Preserve the character exactly: same hair length, same hair style, same hair color, same clothing, same body proportions, same age, same facial features, same skin tone. Only the pose and background change. '
+          : 'Transform the person from @image1 into a chibi kawaii watercolor character for a children\'s book cover. ';
+        var promptCapaV4 = aberturaCapa
           + 'The character is ' + tipoCapa + ', inspired by the reference photo @image1 in chibi watercolor style. '
           + generoEnfaseCapa + ' '
           + 'EYE COLOR (CRITICAL): examine the actual iris color in the reference photo @image1 and reproduce EXACTLY that same iris color in the chibi. Both eyes must have the SAME identical iris color (perfect symmetry, no heterochromia, no different colors between left and right eye). Match the photo whether eyes are blue, gray, green, hazel, or brown. Do not pick a default. Do not invent a color. '
