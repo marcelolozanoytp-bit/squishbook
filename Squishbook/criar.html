@@ -3124,11 +3124,25 @@ function reforcoEscalaV4(personagens){
   var temAdulto = gfs.some(function(g){return g.faixa==='adult' || g.faixa==='elderly';});
   var temCrianca = gfs.some(function(g){return g.faixa==='child' || g.faixa==='baby/toddler';});
   if(temAdulto && temCrianca){
-    // Sessão 7 (06/05 22:55): reforço V3 com instruções numéricas explícitas.
-    // Sessão 6 reforço V2 falhou: Mamãe ainda sai do tamanho do Beni em 5+ páginas
-    // (testes 22:32 e anteriores). Hipótese: instruções qualitativas ("taller")
-    // são fracas frente ao chibi-bias do FLUX. Solução: ratios numéricos.
-    return ' SCALE RULE (ABSOLUTE CRITICAL, HIGHEST PRIORITY): The adult character is approximately 1.6x taller than the child character. Adult body height occupies 90% of the vertical frame; child body height occupies approximately 60-65% of the vertical frame. The child\'s head reaches the adult\'s sternum or shoulder, NEVER the adult\'s face level. Adult head-to-body ratio is 1:6 (slim chibi adult). Child head-to-body ratio is 1:3 (round chibi child). The visual height difference must be IMMEDIATELY OBVIOUS in the composition. The adult has fully mature adult facial features (defined jawline, refined nose, NOT a round childlike face), adult body shape (broader shoulders, longer legs, elongated torso), and NO youth markers (NO school uniform, NO plaid skirt, NO knee socks, NO schoolgirl outfit, NO pigtails). The adult is a real grown-up parent in their 30s or 40s, never a teenager, never a young woman, never a schoolgirl. If they appear side by side in any pose (standing, sitting, hugging, kneeling), the height difference must remain proportional to their real ages. ';
+    // FIX 09/05 v3 — regra de escala robusta em QUALQUER enquadramento.
+    // Versão anterior usava "% do frame vertical" (90% adulto vs 60% criança),
+    // mas isso falha em close-ups (Pág 6 do teste: torso pra cima, ambos
+    // ocupam 90% do frame, FLUX livre-interpreta proporção e Vittorio fica
+    // do tamanho da Mamãe). Nova versão usa proporção RELATIVA entre os 2
+    // personagens (não dependente de framing) + ancora idades explícitas.
+    return ' SCALE RULE (ABSOLUTE CRITICAL, HIGHEST PRIORITY — applies in any framing: full body, torso, close-up, sitting, standing, hugging): '
+      + 'The adult is a fully grown parent in their 30s or 40s. The child is a small 6-year-old kid. '
+      + 'The adult must be VISIBLY MUCH TALLER and LARGER than the child in this scene. '
+      + 'Specific proportion (always preserve regardless of camera angle or crop): the top of the child\'s head reaches between the adult\'s chest and shoulder — never higher. '
+      + 'The child\'s face is positioned at the level of the adult\'s chest, NEVER at the level of the adult\'s face or shoulders. '
+      + 'When standing side by side: clear height gap between them. '
+      + 'When hugging: the child reaches up to embrace the adult\'s waist or chest. '
+      + 'When sitting together: the adult is still visibly larger in body and head size. '
+      + 'When the camera is close (torso or face shot): the adult\'s head fills more vertical space than the child\'s head, and their faces are at different heights in the frame. '
+      + 'Adult head-to-body ratio: 1:6 (slim chibi adult, longer torso and legs). Child head-to-body ratio: 1:3 (round chibi child, shorter limbs, larger head relative to body). '
+      + 'Adult face: fully mature features — defined jawline, refined nose, adult cheekbones. NOT round, NOT childlike. '
+      + 'Child face: round, soft, baby-like cheeks, small nose. '
+      + 'The adult has NO youth markers: NO school uniform, NO plaid skirt, NO knee socks, NO schoolgirl outfit, NO pigtails. The adult is a real grown-up parent, never a teenager, never a young woman, never a schoolgirl. ';
   }
   return '';
 }
@@ -3192,6 +3206,12 @@ function construirPromptV4(parsNaPg, cenario, acao, expressao, roteiro, atmosfer
     cenaTexto += 'Place the EXACT SAME chibi character from ' + refs[0].split(' is ')[0] + ' into a new scene. ';
     cenaTexto += 'The reference image is ALREADY in chibi watercolor style — DO NOT redesign or reinterpret it. ';
     cenaTexto += 'Preserve the character exactly as shown in the reference: same hair length, same hair style, same hair color, same clothing, same body proportions, same age, same facial features, same skin tone. ';
+    // FIX 09/05 v3 — reforço explícito de calçado e roupa completa.
+    // FLUX estava omitindo sapato em cenas com pose estática (Vittorio descalço
+    // em 3 de 6 páginas no teste pós-patch1, mesmo o chibi canônico mostrando
+    // tênis claramente). Calçado tratado como item separado e crítico.
+    cenaTexto += 'FOOTWEAR (CRITICAL): the character MUST wear the EXACT shoes shown in the reference image. If the reference shows sneakers, draw sneakers. If loafers, draw loafers. NEVER draw the character barefoot unless the reference itself is barefoot. The shoe color, style, and shape must match the reference exactly. ';
+    cenaTexto += 'CLOTHING (CRITICAL): every clothing item visible in the reference (top, bottom, shoes, accessories) must be reproduced exactly. Do not change the shoe style, do not change the pants color, do not omit any clothing item. ';
     cenaTexto += 'Only the setting, pose, and facial expression change. ';
     cenaTexto += 'Action: ' + acao + '. ';
     cenaTexto += 'Setting: ' + cenario + '. ';
@@ -3214,6 +3234,12 @@ function construirPromptV4(parsNaPg, cenario, acao, expressao, roteiro, atmosfer
     cenaTexto += 'Place the EXACT SAME chibi characters from @image1 and @image2 together into a new scene. ';
     cenaTexto += 'The reference images are ALREADY in chibi watercolor style — DO NOT redesign or reinterpret them. ';
     cenaTexto += 'Preserve each character exactly as shown in their reference image: same hair length, same hair style, same hair color, same clothing (top, bottom, shoes), same body proportions, same age appearance, same facial features, same skin tone. ';
+    // FIX 09/05 v3 — reforço explícito de calçado e roupa completa para AMBOS.
+    // No teste pós-patch1: Mamãe trocou sapatilha bege por salto vermelho
+    // (Pág 4-5), Vittorio apareceu descalço (Pág 3, 4, 6). Calçado precisa
+    // ser tratado como item crítico separado, igual roupa.
+    cenaTexto += 'FOOTWEAR (CRITICAL — applies to both characters): each character MUST wear the EXACT shoes shown in their own reference image. If @image1 shows sneakers, draw sneakers in @image1. If @image2 shows loafers, draw loafers in @image2. NEVER draw a character barefoot unless their reference is barefoot. NEVER swap shoe styles between characters. The shoe color, style, height, and shape must match each reference exactly. Especially: do NOT change flat shoes into high heels, and do NOT change sneakers into other footwear. ';
+    cenaTexto += 'CLOTHING COMPLETE (CRITICAL): every clothing item visible in each reference (top, bottom, shoes, socks, accessories) must be reproduced exactly in the new scene. Each character keeps their full outfit from their own reference image. ';
     cenaTexto += 'Only the setting, pose, and facial expressions change between scenes. ';
     cenaTexto += 'Each character keeps their own identity from their own reference: @image1 stays exactly like @image1, @image2 stays exactly like @image2. ';
     cenaTexto += 'Action: ' + acao + '. ';
