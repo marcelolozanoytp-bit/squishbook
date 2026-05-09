@@ -2444,6 +2444,18 @@ async function gerarCenas(){
   // Trade-off: +1 chamada FLUX.2 por personagem com foto (~$0.04 cada,
   //            ~15-25s extra na espera total) em troca de identidade estável.
   // Fallback: se chibi falhar, cena cai pra fotoUrl original (Sessão 5 puro).
+  // Sessão 8 (09/05): flag ST.chibisGerados + ST.chibisCache pra impedir geração dupla
+  // (observado no console: gerarCenas chamado 2x = 4 chamadas FLUX em vez de 2).
+  if(ST.chibisGerados && ST.chibisCache){
+    // Restaura chibis do cache (caso ST.personagens tenha sido recriado)
+    for(var rci=0; rci<ST.personagens.length; rci++){
+      var rcp = ST.personagens[rci];
+      if(!rcp.chibiAvatarUrl && ST.chibisCache[rcp.nome]){
+        rcp.chibiAvatarUrl = ST.chibisCache[rcp.nome];
+      }
+    }
+    console.log('[Sessão 8] chibis ja gerados, pulando regeração');
+  } else {
   console.log('[Sessão 6] iniciando geração de avatares chibi canônicos');
   var personagensComFoto = ST.personagens.filter(function(p){return p.fotoUrl && !p.chibiAvatarUrl;});
   if(personagensComFoto.length > 0){
@@ -2539,6 +2551,15 @@ async function gerarCenas(){
     var chibiOk = personagensComFoto.filter(function(p){return p.chibiAvatarUrl;}).length;
     console.log('[Sessão 6] chibi avatars prontos: '+chibiOk+'/'+personagensComFoto.length);
   }
+  // Sessão 8 (09/05): popula cache + seta flag pra evitar regeração se gerarCenas
+  // for chamado de novo (ex: após aplicarAjuste). Cada chibi custa ~$0.04 e ~15s.
+  ST.chibisCache = {};
+  for(var ci=0; ci<ST.personagens.length; ci++){
+    var cp = ST.personagens[ci];
+    if(cp.chibiAvatarUrl) ST.chibisCache[cp.nome] = cp.chibiAvatarUrl;
+  }
+  ST.chibisGerados = true;
+  } // fecha else do bloqueio anti-dupla geração
 
   // Determina número de páginas: 12 para impresso, 6 para digital
   var totalPaginasAlvo = (ST.formato==='impresso') ? 12 : 6;
@@ -3073,7 +3094,7 @@ function reforcoEscalaV4(personagens){
     // Sessão 6 reforço V2 falhou: Mamãe ainda sai do tamanho do Beni em 5+ páginas
     // (testes 22:32 e anteriores). Hipótese: instruções qualitativas ("taller")
     // são fracas frente ao chibi-bias do FLUX. Solução: ratios numéricos.
-    return ' SCALE RULE (ABSOLUTE CRITICAL, HIGHEST PRIORITY): The adult character is approximately 1.6x taller than the child character. Adult body height occupies 90% of the vertical frame; child body height occupies approximately 60-65% of the vertical frame. The child\'s head reaches the adult\'s sternum or shoulder, NEVER the adult\'s face level. Adult head-to-body ratio is 1:6 (slim chibi adult). Child head-to-body ratio is 1:3 (round chibi child). The visual height difference must be IMMEDIATELY OBVIOUS in the composition. The adult has fully mature adult facial features (defined jawline, refined nose, NOT a round childlike face), adult body shape (broader shoulders, longer legs, elongated torso), and NO youth markers (NO school uniform, NO plaid skirt, NO knee socks, NO schoolgirl outfit, NO pigtails). The adult is a real grown-up parent in their 30s or 40s, never a teenager, never a young woman, never a schoolgirl. If they appear side by side in any pose (standing, sitting, hugging, kneeling), the height difference must remain proportional to their real ages. ';
+    return ' SCALE RULE (ABSOLUTE CRITICAL, HIGHEST PRIORITY): The adult character is approximately 1.8x taller than the child character. Adult body height occupies 90% of the vertical frame; child body height occupies approximately 50-55% of the vertical frame. The child\'s head reaches the adult\'s sternum or shoulder, NEVER the adult\'s face level. Adult head-to-body ratio is 1:6 (slim chibi adult). Child head-to-body ratio is 1:3 (round chibi child). The visual height difference must be IMMEDIATELY OBVIOUS in the composition. The adult has fully mature adult facial features (defined jawline, refined nose, NOT a round childlike face), adult body shape (broader shoulders, longer legs, elongated torso), and NO youth markers (NO school uniform, NO plaid skirt, NO knee socks, NO schoolgirl outfit, NO pigtails). The adult is a real grown-up parent in their 30s or 40s, never a teenager, never a young woman, never a schoolgirl. If they appear side by side in any pose (standing, sitting, hugging, kneeling), the height difference must remain proportional to their real ages. ';
   }
   return '';
 }
@@ -3139,7 +3160,7 @@ function construirPromptV4(parsNaPg, cenario, acao, expressao, roteiro, atmosfer
     // FLUX dá mais peso aos primeiros tokens. Antes ficava depois das refs e
     // estava sendo ignorado.
     var escalaPriori = reforcoEscalaV4(parsNaPg);
-    cenaTexto = lockBlock + escalaPriori;
+    cenaTexto = escalaPriori + lockBlock;
     cenaTexto += 'Transform the people from @image1 and @image2 into chibi kawaii watercolor characters together in the same scene. ';
     cenaTexto += 'Action: ' + acao + '. ';
     cenaTexto += 'Setting: ' + cenario + '. ';
